@@ -68,10 +68,6 @@ client.on("message", (topic, payload) => {
 
         const locId = parseInt(m[1]);
         const devId = parseInt(m[2]);
-        if (typeof locId !== "number" || typeof devId !== "number") {
-            console.error("invalid id for message");
-            return;
-        }
 
         // find device
         let dev = undefined;
