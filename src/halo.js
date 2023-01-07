@@ -74,7 +74,7 @@ export class Device {
             0x80 + this.did, 0x80, 0x73, 0, 0x0A,
             0, 0, 0, brightness, 0, 0, 0, 0
         ]);
-        // console.log("brighty", packet);
+        console.log("brightness", this.mac, brightness, packet);
         return await this.sendPacket(packet);
     }
 
@@ -85,7 +85,7 @@ export class Device {
             0x80 + this.did, 0x80, 0x73, 0, 0x1D,
             0, 0, 0, 0x01, colorBytes[0], colorBytes[1], 0, 0
         ]);
-        // console.log("tempy", packet);
+        console.log("set_color_temp", this.mac, color, packet);
         return await this.sendPacket(packet);
     }
 }
