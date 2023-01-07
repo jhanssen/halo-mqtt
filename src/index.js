@@ -13,7 +13,7 @@ const mqttUser = option("mqtt-user");
 const mqttPassword = option("mqtt-password");
 const mqttHost = option("mqtt-host");
 
-const data = {};
+const data = { state: {} };
 
 if (mqttHost === undefined) {
     console.error("need an mqtt host");
@@ -33,13 +33,13 @@ if (mqttPassword !== undefined) {
     mqttOpts.password = mqttPassword;
 }
 
-const SetTopic = "/halo-mqtt/set-value";
-const GetTopic = "/halo-mqtt/get-devices";
+const CommandTopic = "halomqtt/light/command";
+const StateTopic = "halomqtt/light/state";
 
 const client = mqtt.connect(mqttHost, mqttOpts);
 client.on("connect", () => {
-    client.subscribe([SetTopic, GetTopic], () => {
-        console.log("listening for set-value and get-devices");
+    client.subscribe([CommandTopic + "/+"], () => {
+        console.log("listening for halomqtt/light/set");
     });
     publishDevices();
 });
@@ -49,7 +49,7 @@ client.on("message", (topic, payload) => {
         console.error("no locations");
         return;
     }
-    if (topic === SetTopic) {
+    if (topic.startsWith(CommandTopic)) {
         let json;
         try {
             json = JSON.parse(payload.toString());
@@ -57,15 +57,19 @@ client.on("message", (topic, payload) => {
             console.error("json parse error", e.message, payload.toString());
             return;
         }
-        const locId = json.locId;
-        const devId = json.devId;
-        if (typeof locId !== "number" || typeof devId !== "number") {
-            console.error("invalid id for message");
+        console.log("got set topic", topic, json);
+
+        const rx = /\/halomqtt_([0-9]+)_([0-9]+)$/;
+        const m = rx.exec(topic);
+        if (!m) {
+            console.error("invalid command topic", topic);
             return;
         }
-        const value = json.value;
-        if (typeof value !== "number") {
-            console.error("invalid value for message");
+
+        const locId = parseInt(m[1]);
+        const devId = parseInt(m[2]);
+        if (typeof locId !== "number" || typeof devId !== "number") {
+            console.error("invalid id for message");
             return;
         }
 
@@ -87,23 +91,53 @@ client.on("message", (topic, payload) => {
             return;
         }
 
-        switch (json.type) {
-        case "set-brightness":
-            dev.set_brightness(value).catch(e => {
+        // update state
+        const devStr = `halomqtt_${locId}_${devId}`;
+        const currentState = data.state[devStr];
+        if (currentState === undefined) {
+            console.error(`unable to find current state for ${devStr}`);
+            return;
+        }
+
+        let brightness = undefined;
+        let colorTemp = undefined;
+        if ("brightness" in json) {
+            brightness = json.brightness;
+        }
+        if ("state" in json) {
+            // ON or OFF
+            if (json.state === "OFF") {
+                brightness = 0;
+            } else if (json.state === "ON" && brightness === undefined && currentState.brightness === 0) {
+                brightness = 255;
+            }
+        }
+        if ("color_temp" in json) {
+            colorTemp = Math.floor(1000000 / json.color_temp);
+        }
+
+        if (brightness === undefined && colorTemp === undefined) {
+            console.error("no brightness or colorTemp", topic, json);
+        }
+
+        if (brightness !== undefined) {
+            console.log("set brightness", devStr, brightness);
+            dev.set_brightness(brightness).catch(e => {
                 console.error("failed to set brightness", e);
             });
-            break;
-        case "set-color-temp":
-            dev.set_color_temp(value).catch(e => {
+            currentState.brightness = brightness;
+            currentState.state = brightness === 0 ? "OFF" : "ON";
+        }
+        if (colorTemp !== undefined) {
+            console.log("set color temp", devStr, brightness);
+            dev.set_color_temp(colorTemp).catch(e => {
                 console.error("failed to set color temp", e);
             });
-            break;
-        default:
-            console.error(`invalid data type "${json.type}"`);
-            break;
+            currentState.color_temp = json.color_temp;
         }
-    } else if (topic === GetTopic) {
-        publishDevices();
+
+        console.log("update state", `${StateTopic}/${devStr}`, currentState);
+        client.publish(`${StateTopic}/${devStr}`, JSON.stringify(currentState), { retain: true });
     }
 });
 
@@ -124,9 +158,35 @@ function publishDevices() {
                 name: dev.name,
                 mac: dev.mac
             });
+            const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+
+            const discovery = {
+                name: dev.name || devStr,
+                command_topic: `${CommandTopic}/${devStr}`,
+                state_topic: `${StateTopic}/${devStr}`,
+                object_id: devStr,
+                unique_id: devStr,
+                brightness: true,
+                color_mode: true,
+                supported_color_modes: ["color_temp"],
+                max_mireds: Math.floor(1000000 / 2700),
+                min_mireds: Math.floor(1000000 / 5000),
+                schema: "json",
+            };
+            console.log("discovery", devStr, discovery);
+            client.publish(`homeassistant/light/${devStr}/config`, JSON.stringify(discovery), { retain: true });
+            // initial state
+            const initial = {
+                state: "ON",
+                color_temp: Math.floor(1000000 / 5000),
+                brightness: 255,
+                color_mode: "color_temp"
+            };
+            console.log("initial state", devStr, initial);
+            client.publish(`${StateTopic}/${devStr}`, JSON.stringify(initial), { retain: true });
+            data.state[devStr] = initial;
         }
     }
-    client.publish("/halo-mqtt/devices", JSON.stringify(msg));
 }
 
 async function init() {
