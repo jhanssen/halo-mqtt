@@ -36,11 +36,13 @@ if (mqttPassword !== undefined) {
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
 
+let mqttConnected = false;
 const client = mqtt.connect(mqttHost, mqttOpts);
 client.on("connect", () => {
     client.subscribe([CommandTopic + "/+"], () => {
         console.log("listening for halomqtt/light/set");
     });
+    mqttConnected = true;
     publishDevices();
 });
 client.on("message", (topic, payload) => {
@@ -138,7 +140,7 @@ client.on("message", (topic, payload) => {
 });
 
 function publishDevices() {
-    if (data.locations === undefined)
+    if (data.locations === undefined || !mqttConnected)
         return;
     const msg = [];
     for (const loc of data.locations) {
