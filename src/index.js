@@ -172,15 +172,18 @@ function publishDevices() {
             console.log("discovery", devStr, discovery);
             client.publish(`homeassistant/light/${devStr}/config`, JSON.stringify(discovery), { retain: true });
             // initial state
-            const initial = {
-                state: "ON",
-                color_temp: Math.floor(1000000 / 5000),
-                brightness: 255,
-                color_mode: "color_temp"
+            let initial = data.state[devStr];
+            if (initial === undefined) {
+                initial = {
+                    state: "ON",
+                    color_temp: Math.floor(1000000 / 5000),
+                    brightness: 255,
+                    color_mode: "color_temp"
+                };
+                data.state[devStr] = initial;
             };
             console.log("initial state", devStr, initial);
             client.publish(`${StateTopic}/${devStr}`, JSON.stringify(initial), { retain: true });
-            data.state[devStr] = initial;
         }
     }
 }
