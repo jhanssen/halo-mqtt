@@ -1,7 +1,7 @@
 import options from "@jhanssen/options";
 import mqtt from "mqtt";
 
-import { list_locations } from "./halo.js";
+import { list_locations, destroy } from "./halo.js";
 
 const option = options("halo-mqtt");
 
@@ -13,7 +13,7 @@ const mqttUser = option("mqtt-user");
 const mqttPassword = option("mqtt-password");
 const mqttHost = option("mqtt-host");
 
-const data = { state: {} };
+const data = { state: {}, exited: false };
 
 if (mqttHost === undefined) {
     console.error("need an mqtt host");
@@ -142,20 +142,8 @@ client.on("message", (topic, payload) => {
 function publishDevices() {
     if (data.locations === undefined || !mqttConnected)
         return;
-    const msg = [];
     for (const loc of data.locations) {
-        const devices = [];
-        msg.push({
-            id: loc.location_id,
-            name: loc.name,
-            devices
-        });
         for (const dev of loc.devices) {
-            devices.push({
-                id: dev.did,
-                name: dev.name,
-                mac: dev.mac
-            });
             const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
 
             const discovery = {
@@ -190,10 +178,47 @@ function publishDevices() {
     }
 }
 
+function exit() {
+    if (data.exited)
+        return;
+    data.exited = true;
+
+    console.log("exiting...");
+
+    const waits = [];
+    for (const loc of data.locations) {
+        for (const dev of loc.devices) {
+            // remove device from hass
+            const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+            client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
+
+            console.log("disconnecting from", dev.mac);
+            waits.push(dev.disconnect());
+        }
+    }
+
+    if (waits.length === 0) {
+        destroy();
+        process.exit(0);
+    } else {
+        Promise.all(waits).then(() => {
+            destroy();
+            process.exit(0);
+        }).catch(e => {
+            console.error("failed to disconnect from device", e.message);
+            destroy();
+            process.exit(1);
+        });
+    }
+}
+
 async function init() {
     const locs = await list_locations(haloEmail, haloPassword, haloHost);
     data.locations = locs;
     publishDevices();
+
+    process.once("SIGINT", exit);
+    process.once("SIGTERM", exit);
 }
 
 (async function() {

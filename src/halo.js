@@ -16,6 +16,7 @@ export class Device {
         this.name = name;
         this.mac = mac.replace(/(.{2})/g,"$1:").slice(0, -1).toUpperCase();
         this.key = key;
+        this.bdev = undefined;
     }
 
     async init() {
@@ -34,6 +35,7 @@ export class Device {
 
         this.characteristicLow = characteristicLow;
         this.characteristicHigh = characteristicHigh;
+        this.bdev = bdev;
 
         console.log("- initialized");
     }
@@ -48,7 +50,7 @@ export class Device {
 
         for (let i = 0; i < MaxTries; ++i) {
             try {
-                if (this.characteristicLow === undefined) {
+                if (this.bdev === undefined) {
                     await this.init();
                 }
 
@@ -59,6 +61,11 @@ export class Device {
             } catch (e) {
                 this.characteristicLow = undefined;
                 this.characteristicHigh = undefined;
+
+                if (this.bdev) {
+                    await this.bdev.disconnect();
+                    this.bdev = undefined;
+                }
 
                 if (i === MaxTries - 1) {
                     throw e;
@@ -87,6 +94,15 @@ export class Device {
         ]);
         console.log("set_color_temp", this.mac, color, packet);
         return await this.sendPacket(packet);
+    }
+
+    async disconnect() {
+        if (this.bdev) {
+            await this.bdev.disconnect();
+            this.bdev = undefined;
+            this.characteristicLow = undefined;
+            this.characteristicHigh = undefined;
+        }
     }
 }
 
@@ -173,13 +189,14 @@ export async function list_locations(email, password, host) {
     if (!await adapter.isDiscovering())
         await adapter.startDiscovery();
 
-    if (data.adapter === undefined) {
-        process.on("exit", () => {
-            destroy();
-        });
-    }
-
+    data.destroy = destroy;
     data.adapter = adapter;
 
     return await load_locations(host);
+}
+
+export function destroy() {
+    if (data.destroy !== undefined) {
+        data.destroy();
+    }
 }
