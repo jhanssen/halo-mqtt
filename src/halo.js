@@ -20,7 +20,7 @@ export class Device {
     }
 
     async init() {
-        console.log("initializing", this.name, this.mac);
+        console.log("initializing", `'${this.name}'`, this.mac);
         const bdev = await data.adapter.waitDevice(this.mac);
         await bdev.connect();
         const gatt = await bdev.gatt();
