@@ -4,7 +4,7 @@ import xdg from "xdg-basedir";
 import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { initialize_locations, destroy } from "./halo.js";
-import { list_locations } from "./api.js";
+import { list_locations } from "./cloud.js";
 
 const option = options("halo-mqtt");
 
@@ -319,8 +319,18 @@ async function store_locations(file, locs) {
 }
 
 async function initCloud() {
-    const apilocs = await list_locations(haloEmail, haloPassword, haloHost);
     console.log("initing cloud");
+    let apilocs;
+    try {
+        apilocs = await list_locations(haloEmail, haloPassword, haloHost);
+    } catch (e) {
+        if (data.locations) {
+            // ignore this cloud error since we already have cached locations
+            console.error("ignored cloud error", e);
+            return;
+        }
+        throw e;
+    }
     const locs = await initialize_locations(apilocs);
     console.log("publishing cloud");
     if (publishDevices(locs, PublishOverride)) {
@@ -329,8 +339,8 @@ async function initCloud() {
 }
 
 async function initLocal() {
-    const apilocs = await read_locations(localLocationsFile);
     console.log("initing local");
+    const apilocs = await read_locations(localLocationsFile);
     const locs = await initialize_locations(apilocs);
     console.log("publishing local");
     publishDevices(locs, PublishKeep);
