@@ -225,8 +225,8 @@ function publishDevices(locs, mode) {
     }
     for (const loc of locs) {
         for (const dev of loc.devices) {
-            let shouldPublish = true;
-            if (data.locations !== undefined) {
+            let shouldPublish = !dev.dead;
+            if (shouldPublish && data.locations !== undefined) {
                 for (const eloc of data.locations) {
                     for (const edev of eloc.devices) {
                         if (edev.mac === dev.mac) {
