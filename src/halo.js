@@ -22,7 +22,7 @@ export class Device {
     }
 
     async init() {
-        console.log("initializing", `'${this.name}'`, this.mac);
+        console.log("initializing device", this.name, this.mac);
         const retry = { maxRetries: MaxTries, retryIntervalMs: MsPerTry };
         const bdev = await retryOnError({ type: "org.bluez.Error.Failed" }, retry, async () => {
             const bdev = await data.adapter.getDeviceByAddress(this.mac, retry);
@@ -64,7 +64,7 @@ export class Device {
         this.bdev = bdev;
         this.path = bdev.path;
 
-        console.log("- initialized");
+        console.log("- initialized", this.name, this.mac);
     }
 
     async sendPacket(packet) {
@@ -116,16 +116,16 @@ export class Device {
     }
 
     clear() {
+        // do not clear path here since we depend on it to reinitialize the device if it's readded
         this.bdev = undefined;
-        this.path = undefined;
         this.characteristicLow = undefined;
         this.characteristicHigh = undefined;
     }
 }
 
 function checkDeviceAdded(added) {
-    // console.log("checkDeviceRemoved", removed);
-    if ("path" in added && "interfaceNames" in added && added.interfaceNames.indexOf("org.bluez.Device1") !== -1) {
+    // console.log("checkDeviceAdded", added);
+    if ("path" in added && "objects" in added && Object.keys(added.objects).indexOf("org.bluez.Device1") !== -1) {
         // potential device
         if (data.locations) {
             for (const loc of data.locations) {
@@ -135,11 +135,13 @@ function checkDeviceAdded(added) {
                             return;
                         console.log("device added", dev.mac);
 
+                        dev.dead = false;
                         dev.init().then(() => {
-                            dev.dead = false;
                             if (data.onDeviceAlive)
                                 data.onDeviceAlive(loc, dev);
                         }).catch(e => {
+                            dev.dead = true;
+                            dev.clear();
                             console.error("unable to reinit device", dev.mac);
                         });
                         return;
@@ -160,8 +162,8 @@ function checkDeviceRemoved(removed) {
                     if (dev.path === removed.path) {
                         if (dev.dead)
                             return;
-                        dev.clear();
                         dev.dead = true;
+                        dev.clear();
                         console.log("device removed", dev.mac);
 
                         if (data.onDeviceDead)
