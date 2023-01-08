@@ -220,9 +220,8 @@ function publishDevices(locs, mode) {
     }
     if (data.locations !== undefined && mode === PublishKeep)
         return false;
-    if (locs !== data.locations) {
-        unpublishDevices(locs);
-    }
+
+    unpublishDevices(locs);
     for (const loc of locs) {
         for (const dev of loc.devices) {
             let shouldPublish = !dev.dead;
@@ -347,6 +346,23 @@ async function store_locations(file, locs) {
     }
 }
 
+function copyDevices(locs) {
+    const cloneLoc = loc => {
+        return {
+            id: loc.id,
+            name: loc.name,
+            passphrase: loc.passphrase,
+            devices: loc.devices.slice(0)
+        };
+    };
+
+    const ret = [];
+    for (const loc of locs) {
+        ret.push(cloneLoc(loc));
+    }
+    return ret;
+}
+
 async function initCloud() {
     console.log("initing cloud");
     let apilocs;
@@ -362,7 +378,7 @@ async function initCloud() {
     }
     const locs = await initialize_locations(apilocs);
     console.log("publishing cloud");
-    if (publishDevices(locs, PublishOverride)) {
+    if (publishDevices(copyDevices(locs), PublishOverride)) {
         await store_locations(localLocationsFile, apilocs);
     }
 }
@@ -372,7 +388,7 @@ async function initLocal() {
     const apilocs = await read_locations(localLocationsFile);
     const locs = await initialize_locations(apilocs);
     console.log("publishing local");
-    publishDevices(locs, PublishKeep);
+    publishDevices(copyDevices(locs), PublishKeep);
 }
 
 async function init() {
