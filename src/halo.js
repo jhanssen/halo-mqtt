@@ -23,6 +23,10 @@ export class Device {
         console.log("initializing", `'${this.name}'`, this.mac);
         const retry = { maxRetries: MaxTries, retryIntervalMs: MsPerTry };
         const bdev = await data.adapter.getDeviceByAddress(this.mac, retry);
+        if (bdev === undefined) {
+            console.error(`- no device for ${this.name} ${this.mac}`);
+            return;
+        }
         await bdev.connect();
         await bdev.Connected.waitForValue(true);
 
