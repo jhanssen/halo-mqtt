@@ -57,30 +57,12 @@ export class Device {
         // console.log(low);
         // console.log(high);
 
-        for (let i = 0; i < MaxTries; ++i) {
-            try {
-                if (this.bdev === undefined) {
-                    await this.init();
-                }
-
-                await this.characteristicLow.writeValue(Array.from(low), {});
-                await this.characteristicHigh.writeValue(Array.from(high), {});
-
-                return true;
-            } catch (e) {
-                this.characteristicLow = undefined;
-                this.characteristicHigh = undefined;
-
-                if (this.bdev) {
-                    await this.bdev.disconnect();
-                    this.bdev = undefined;
-                }
-
-                if (i === MaxTries - 1) {
-                    throw e;
-                }
-            }
+        if (this.bdev === undefined) {
+            await this.init();
         }
+
+        await this.characteristicLow.writeValue(Array.from(low), {});
+        await this.characteristicHigh.writeValue(Array.from(high), {});
 
         return false;
     }
@@ -176,16 +158,7 @@ export async function initialize_locations(locations) {
                 }
                 // no, add it
                 const ndev = new Device(dev.did, dev.pid, dev.name, dev.mac, key);
-                for (let i = 0; i < MaxTries; ++i) {
-                    try {
-                        await ndev.init();
-                        break;
-                    } catch (e) {
-                        if (e.type !== "org.bluez.Error.Failed" || i == MaxTries - 1) {
-                            throw e;
-                        }
-                    }
-                }
+                await ndev.init();
                 devices.push(ndev);
             }
         }
