@@ -14,14 +14,14 @@ export function waitForAsync(timeout, call, ...args) {
             reject(new AsyncTimeoutError(timeout));
         }, timeout);
         call(...args).then(data => {
-            clearTimeout(tt);
             if (rejected)
                 return;
+            clearTimeout(tt);
             resolve(data);
         }).catch(e => {
-            clearTimeout(tt);
             if (rejected)
                 return;
+            clearTimeout(tt);
             rejected = true;
             reject(e);
         });
