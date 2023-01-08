@@ -195,7 +195,6 @@ function publishDevices(locs, mode) {
     }
     for (const loc of locs) {
         for (const dev of loc.devices) {
-            const devStr = `halomqtt_${loc.id}_${dev.did}`;
             let shouldPublish = true;
             if (data.locations !== undefined) {
                 for (const eloc of data.locations) {
@@ -213,6 +212,7 @@ function publishDevices(locs, mode) {
             if (!shouldPublish)
                 continue;
 
+            const devStr = `halomqtt_${loc.id}_${dev.did}`;
             const discovery = {
                 name: dev.name || devStr,
                 command_topic: `${CommandTopic}/${devStr}`,
