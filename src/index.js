@@ -135,7 +135,7 @@ client.on("message", (topic, payload) => {
             currentState.state = brightness === 0 ? "OFF" : "ON";
         }
         if (colorTemp !== undefined) {
-            console.log("set color temp", devStr, brightness);
+            console.log("set color temp", devStr, colorTemp);
             dev.set_color_temp(colorTemp).catch(e => {
                 console.error("failed to set color temp", e);
             });
