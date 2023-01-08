@@ -1,9 +1,11 @@
 // most of this is ported from https://github.com/nayaverdier/halohome/blob/main/halohome/__init__.py
 
-import { createBluetooth } from "node-ble";
+import { Bluez, Adapter, Variant } from "@sorrir/bluetooth";
 import { generate_key, make_packet, random_seq } from "./crypto.js";
+import { waitForAsync, AsyncTimeoutError } from "./wait.js";
 
 const MaxTries = 3;
+const MsPerTry = 5000;
 
 const data = {};
 
@@ -19,17 +21,26 @@ export class Device {
 
     async init() {
         console.log("initializing", `'${this.name}'`, this.mac);
-        const bdev = await data.adapter.waitDevice(this.mac);
+        const retry = { maxRetries: MaxTries, retryIntervalMs: MsPerTry };
+        const bdev = await data.adapter.getDeviceByAddress(this.mac, retry);
         await bdev.connect();
-        const gatt = await bdev.gatt();
+        await bdev.Connected.waitForValue(true);
 
         const SERVICE = "0000fef1-0000-1000-8000-00805f9b34fb";
         const CHARACTERISTIC_LOW = "c4edc000-9daf-11e3-8003-00025b000b00";
         const CHARACTERISTIC_HIGH = "c4edc000-9daf-11e3-8004-00025b000b00";
 
-        const service = await gatt.getPrimaryService(SERVICE);
-        const characteristicLow = await service.getCharacteristic(CHARACTERISTIC_LOW);
-        const characteristicHigh = await service.getCharacteristic(CHARACTERISTIC_HIGH);
+        const service = await bdev.getService({ UUID: SERVICE }, retry);
+        if (service === undefined) {
+            console.error(`- no service for ${this.name} ${this.mac}`);
+            return;
+        }
+        const characteristicLow = await service.getCharacteristic({ UUID: CHARACTERISTIC_LOW }, retry);
+        const characteristicHigh = await service.getCharacteristic({ UUID: CHARACTERISTIC_HIGH }, retry);
+        if (characteristicLow === undefined || characteristicHigh === undefined) {
+            console.error(`- no characteristic for ${this.name} ${this.mac}`);
+            return;
+        }
 
         this.characteristicLow = characteristicLow;
         this.characteristicHigh = characteristicHigh;
@@ -52,8 +63,8 @@ export class Device {
                     await this.init();
                 }
 
-                await this.characteristicLow.writeValueWithoutResponse(low);
-                await this.characteristicHigh.writeValueWithoutResponse(high);
+                await this.characteristicLow.writeValue(Array.from(low), {});
+                await this.characteristicHigh.writeValue(Array.from(high), {});
 
                 return true;
             } catch (e) {
@@ -106,12 +117,25 @@ export class Device {
 
 export async function initialize_locations(locations) {
     if (data.adapter === undefined) {
-        const { bluetooth, destroy } = createBluetooth();
-        const adapter = await bluetooth.defaultAdapter();
-        if (!await adapter.isDiscovering())
-            await adapter.startDiscovery();
+        console.log("connecting to bluez");
+        const bluez = await new Bluez().init();
+        const adapter = await Adapter.connect(bluez, "/org/bluez/hci0");
+        await adapter.Powered.set(true);
 
-        data.destroy = destroy;
+        if (!await adapter.Discovering.get()) {
+            try {
+                await waitForAsync(7500, () => { return adapter.startDiscovery(); });
+                await adapter.Discovering.waitForValue(true);
+            } catch (e) {
+                if (e instanceof AsyncTimeoutError) {
+                } else {
+                    throw e;
+                }
+            }
+        }
+        await adapter.setDiscoveryFilter({ Transport: new Variant("s", "le") });
+        console.log("connected to bluez");
+
         data.adapter = adapter;
     }
 
@@ -169,10 +193,4 @@ export async function initialize_locations(locations) {
     }
 
     return data.locations;
-}
-
-export function destroy() {
-    if (data.destroy !== undefined) {
-        data.destroy();
-    }
 }

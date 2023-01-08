@@ -11,9 +11,9 @@
   "license": "MIT",
   "dependencies": {
     "@jhanssen/options": "^1.0.31",
+    "@sorrir/bluetooth": "^0.5.4",
     "mqtt": "^4.3.7",
     "needle": "^3.2.0",
-    "node-ble": "^1.9.0",
     "random-int": "^3.0.0",
     "xdg-basedir": "^5.1.0"
   }

@@ -1,9 +1,9 @@
 import options from "@jhanssen/options";
 import mqtt from "mqtt";
-import xdg from "xdg-basedir";
+import { xdgData } from "xdg-basedir";
 import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
-import { initialize_locations, destroy } from "./halo.js";
+import { initialize_locations } from "./halo.js";
 import { list_locations } from "./cloud.js";
 
 const option = options("halo-mqtt");
@@ -36,7 +36,7 @@ if (mqttPassword !== undefined) {
     mqttOpts.password = mqttPassword;
 }
 
-const localLocationsFile = `${xdg.data}/halo-mqtt/locations.json`;
+const localLocationsFile = `${xdgData}/halo-mqtt/locations.json`;
 
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
@@ -267,15 +267,12 @@ function exit() {
     }
 
     if (waits.length === 0) {
-        destroy();
         process.exit(0);
     } else {
         Promise.all(waits).then(() => {
-            destroy();
             process.exit(0);
         }).catch(e => {
             console.error("failed to disconnect from device", e.message);
-            destroy();
             process.exit(1);
         });
     }
