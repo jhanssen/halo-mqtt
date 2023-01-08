@@ -1,7 +1,10 @@
 import options from "@jhanssen/options";
 import mqtt from "mqtt";
-
-import { list_locations, destroy } from "./halo.js";
+import xdg from "xdg-basedir";
+import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
+import { dirname } from "node:path";
+import { initialize_locations, destroy } from "./halo.js";
+import { list_locations } from "./api.js";
 
 const option = options("halo-mqtt");
 
@@ -32,6 +35,8 @@ if (mqttUser !== undefined) {
 if (mqttPassword !== undefined) {
     mqttOpts.password = mqttPassword;
 }
+
+const localLocationsFile = `${xdg.data}/halo-mqtt/locations.json`;
 
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
@@ -77,7 +82,7 @@ client.on("message", (topic, payload) => {
         // find device
         let dev = undefined;
         for (const cloc of data.locations) {
-            if (cloc.location_id === locId) {
+            if (cloc.id === locId) {
                 for (const cdev of cloc.devices) {
                     if (cdev.did === devId) {
                         dev = cdev;
@@ -149,7 +154,7 @@ function unpublishDevices(locs) {
     if (data.locations !== undefined) {
         for (const loc of data.locations) {
             for (const dev of loc.devices) {
-                const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+                const devStr = `halomqtt_${loc.id}_${dev.did}`;
                 existing.push(devStr);
             }
         }
@@ -157,7 +162,7 @@ function unpublishDevices(locs) {
     if (locs !== undefined) {
         for (const loc of locs) {
             for (const dev of loc.devices) {
-                const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+                const devStr = `halomqtt_${loc.id}_${dev.did}`;
                 const idx = existing.indexOf(devStr);
                 if (idx !== -1) {
                     existing.splice(idx, 1);
@@ -172,24 +177,41 @@ function unpublishDevices(locs) {
 
 function publishDevices(locs, mode) {
     if (!mqttConnected)
-        return;
+        return false;
     if (locs === undefined) {
+        let wrote = false;
         if (mode === PublishOverride) {
             // remove all existing
             unpublishDevices(locs);
+            wrote = data.locations !== undefined;
             data.locations = undefined;
         }
-        return;
+        return wrote;
     }
     if (data.locations !== undefined && mode === PublishKeep)
-        return;
+        return false;
     if (locs !== data.locations) {
         unpublishDevices(locs);
     }
-    data.locations = locs;
-    for (const loc of data.locations) {
+    for (const loc of locs) {
         for (const dev of loc.devices) {
-            const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+            const devStr = `halomqtt_${loc.id}_${dev.did}`;
+            let shouldPublish = true;
+            if (data.locations !== undefined) {
+                for (const eloc of data.locations) {
+                    for (const edev of eloc.devices) {
+                        if (edev.mac === dev.mac) {
+                            shouldPublish = false;
+                            break;
+                        }
+                    }
+                    if (!shouldPublish)
+                        break;
+                }
+            }
+
+            if (!shouldPublish)
+                continue;
 
             const discovery = {
                 name: dev.name || devStr,
@@ -221,6 +243,8 @@ function publishDevices(locs, mode) {
             client.publish(`${StateTopic}/${devStr}`, JSON.stringify(initial), { retain: true });
         }
     }
+    data.locations = locs;
+    return true;
 }
 
 function exit() {
@@ -234,7 +258,7 @@ function exit() {
     for (const loc of data.locations) {
         for (const dev of loc.devices) {
             // remove device from hass
-            const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+            const devStr = `halomqtt_${loc.id}_${dev.did}`;
             client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
 
             console.log("disconnecting from", dev.mac);
@@ -257,19 +281,64 @@ function exit() {
     }
 }
 
-async function init() {
-    const locs = await list_locations(haloEmail, haloPassword, haloHost);
+async function read_locations(file) {
+    try {
+        const data = await readFile(file, "utf8");
+        const json = JSON.parse(data);
+        return json;
+    } catch (e) {
+        if (e.code !== "ENOENT") {
+            console.error("read_locations error", e.message);
+            try {
+                await unlink(file);
+            } catch (e) {
+            }
+            throw e;
+        }
+        return undefined;
+    }
+}
 
-    const existing = [];
-    if (data.locations !== undefined) {
-        for (const loc of data.locations) {
-            for (const dev of loc.devices) {
-                existing.push(dev.mac);
+async function store_locations(file, locs) {
+    const ldata = JSON.stringify(locs) || "";
+    for (;;) {
+        try {
+            await writeFile(file, ldata, "utf8");
+            return;
+        } catch (e) {
+            if (e.code === "ENOENT") {
+                // try to make the dir
+                const base = dirname(file);
+                await mkdir(base, { recursive: true });
+            } else {
+                console.error(`unable to store data ${file}, ${e.message}`);
+                throw e;
             }
         }
     }
+}
 
-    publishDevices(locs, PublishOverride);
+async function initCloud() {
+    const apilocs = await list_locations(haloEmail, haloPassword, haloHost);
+    console.log("initing cloud");
+    const locs = await initialize_locations(apilocs);
+    console.log("publishing cloud");
+    if (publishDevices(locs, PublishOverride)) {
+        await store_locations(localLocationsFile, apilocs);
+    }
+}
+
+async function initLocal() {
+    const apilocs = await read_locations(localLocationsFile);
+    console.log("initing local");
+    const locs = await initialize_locations(apilocs);
+    console.log("publishing local");
+    publishDevices(locs, PublishKeep);
+}
+
+async function init() {
+    await initLocal();
+    await initCloud();
 
     process.once("SIGINT", exit);
     process.once("SIGTERM", exit);

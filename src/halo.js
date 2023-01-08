@@ -1,10 +1,8 @@
 // most of this is ported from https://github.com/nayaverdier/halohome/blob/main/halohome/__init__.py
 
-import needle from "needle";
 import { createBluetooth } from "node-ble";
 import { generate_key, make_packet, random_seq } from "./crypto.js";
 
-const defaultHost = "https://api.avi-on.com";
 const MaxTries = 3;
 
 const data = {};
@@ -14,7 +12,7 @@ export class Device {
         this.did = did;
         this.pid = pid;
         this.name = name;
-        this.mac = mac.replace(/(.{2})/g,"$1:").slice(0, -1).toUpperCase();
+        this.mac = mac;
         this.key = key;
         this.bdev = undefined;
     }
@@ -106,93 +104,71 @@ export class Device {
     }
 }
 
-async function make_request(host, path, body) {
-    const headers = {};
-    if (data.auth_token !== undefined) {
-        headers["Accept"] = "application/api.avi-on.v2";
-        headers["Authorization"] = `Token ${data.auth_token}`;
-    }
-    let resp;
-    if (body !== undefined) {
-        resp = await needle("post", `${host}/${path}`, body, { json: true, headers });
-    } else {
-        resp = await needle("get", `${host}/${path}`, undefined, { headers });
-    }
-    // console.log(headers, resp);
-    if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        return resp.body;
-    }
-    throw new Error(`Invalid statusCode ${resp.statusCode} for ${host}/${path}`);
-}
+export async function initialize_locations(locations) {
+    if (data.adapter === undefined) {
+        const { bluetooth, destroy } = createBluetooth();
+        const adapter = await bluetooth.defaultAdapter();
+        if (!await adapter.isDiscovering())
+            await adapter.startDiscovery();
 
-async function load_devices(host, location_id, key) {
-    const resp = await make_request(host, `locations/${location_id}/abstract_devices`);
-    // console.log(resp);
-    let startId = undefined;
-    const devs = [];
-    for (const adev of resp.abstract_devices) {
-        if (startId === undefined)
-            startId = adev.avid;
-        const devId = adev.avid - startId;
-        const pid = adev.pid;
-        const name = adev.name;
-        const mac = adev.friendly_mac_address;
+        data.destroy = destroy;
+        data.adapter = adapter;
+    }
 
-        const dev = new Device(devId, pid, name, mac, key);
-        for (let i = 0; i < MaxTries; ++i) {
-            try {
-                await dev.init();
-                break;
-            } catch (e) {
-                if (e.type !== "org.bluez.Error.Failed" || i == MaxTries - 1) {
-                    throw e;
-                }
+    const existingDevs = [];
+    const existingLocs = [];
+    if (data.locations) {
+        for (const loc of data.locations) {
+            existingLocs.push(loc);
+            for (const dev of loc.devices) {
+                existingDevs.push(dev.mac);
             }
         }
-        devs.push(dev);
     }
-    return devs;
-}
 
-async function load_locations(host) {
-    const resp = await make_request(host, "locations");
-    // console.log(resp);
-    if (!("locations" in resp)) {
-        throw new Error("No locations in locations response");
+    if (locations) {
+        if (data.locations === undefined)
+            data.locations = [];
+        for (const loc of locations) {
+            const key = generate_key(Buffer.concat([
+                Buffer.from(loc.passphrase, "ascii"),
+                Buffer.from([ 0x00, 0x4d, 0x43, 0x50 ])
+            ]));
+
+            const lidx = existingLocs.findIndex(e => e.id === loc.id);
+            let devices = undefined;
+            if (lidx === -1) {
+                data.locations.push({ id: loc.id, name: loc.name, passphrase: loc.passphrase, devices: []});
+                devices = data.locations[data.locations.length - 1].devices;
+            } else {
+                devices = existingLocs[lidx].devices;
+            }
+
+            for (const dev of loc.devices) {
+                // does this device exist already?
+                const didx = existingDevs.indexOf(dev.mac);
+                if (didx !== -1) {
+                    existingDevs.splice(didx, 1);
+                    continue;
+                }
+                // no, add it
+                const ndev = new Device(dev.did, dev.pid, dev.name, dev.mac, key);
+                for (let i = 0; i < MaxTries; ++i) {
+                    try {
+                        await ndev.init();
+                        break;
+                    } catch (e) {
+                        if (e.type !== "org.bluez.Error.Failed" || i == MaxTries - 1) {
+                            throw e;
+                        }
+                    }
+                }
+                devices.push(ndev);
+            }
+        }
     }
-    const locs = [];
-    for (const loc of resp.locations) {
-        const location_id = loc.id;
 
-        const key = generate_key(Buffer.concat([
-            Buffer.from(loc.passphrase, "ascii"),
-            Buffer.from([ 0x00, 0x4d, 0x43, 0x50 ])
-        ]));
-
-        const devices = await load_devices(host, location_id, key);
-        locs.push({ location_id, name: loc.name, passphrase: loc.passphrase, devices });
-    }
-    return locs;
-}
-
-export async function list_locations(email, password, host) {
-    if (host === undefined)
-        host = defaultHost;
-    const resp = await make_request(host, "sessions", { email, password });
-    if (!("credentials" in resp)) {
-        throw new Error("No credentials in response");
-    }
-    data.auth_token = resp.credentials["auth_token"];
-
-    const { bluetooth, destroy } = createBluetooth();
-    const adapter = await bluetooth.defaultAdapter();
-    if (!await adapter.isDiscovering())
-        await adapter.startDiscovery();
-
-    data.destroy = destroy;
-    data.adapter = adapter;
-
-    return await load_locations(host);
+    return data.locations;
 }
 
 export function destroy() {
