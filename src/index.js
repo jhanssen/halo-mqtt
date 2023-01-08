@@ -3,7 +3,7 @@ import mqtt from "mqtt";
 import { xdgData } from "xdg-basedir";
 import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
-import { initialize_locations } from "./halo.js";
+import { initialize_locations, on_device_removed } from "./halo.js";
 import { list_locations } from "./cloud.js";
 
 const option = options("halo-mqtt");
@@ -146,6 +146,20 @@ client.on("message", (topic, payload) => {
         client.publish(`${StateTopic}/${devStr}`, JSON.stringify(currentState), { retain: true });
     }
 });
+
+function unpublishDevice(dev) {
+    for (const loc of data.locations) {
+        for (let i = 0; i < loc.devices.length; ++i) {
+            if (loc.devices[i].mac === dev.mac) {
+                loc.devices.splice(i, 1);
+
+                const devStr = `halomqtt_${loc.id}_${dev.did}`;
+                console.log("unpublishing device", devStr);
+                client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
+            }
+        }
+    }
+}
 
 function unpublishDevices(locs) {
     if (data.locations === undefined)
@@ -344,6 +358,8 @@ async function initLocal() {
 }
 
 async function init() {
+    on_device_removed(dev => unpublishDevice(dev));
+
     await initLocal();
     await initCloud();
 

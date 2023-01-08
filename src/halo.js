@@ -2,7 +2,7 @@
 
 import { Bluez, Adapter, Variant } from "@sorrir/bluetooth";
 import { generate_key, make_packet, random_seq } from "./crypto.js";
-import { waitForAsync, AsyncTimeoutError } from "./wait.js";
+import { waitForAsync, AsyncTimeoutError, retryOnError } from "./wait.js";
 
 const MaxTries = 3;
 const MsPerTry = 5000;
@@ -17,18 +17,25 @@ export class Device {
         this.mac = mac;
         this.key = key;
         this.bdev = undefined;
+        this.path = undefined;
     }
 
     async init() {
         console.log("initializing", `'${this.name}'`, this.mac);
         const retry = { maxRetries: MaxTries, retryIntervalMs: MsPerTry };
-        const bdev = await data.adapter.getDeviceByAddress(this.mac, retry);
+        const bdev = await retryOnError({ type: "org.bluez.Error.Failed" }, retry, async () => {
+            const bdev = await data.adapter.getDeviceByAddress(this.mac, retry);
+            if (bdev === undefined) {
+                return undefined;
+            }
+            await bdev.connect();
+            await bdev.Connected.waitForValue(true);
+            return bdev;
+        });
         if (bdev === undefined) {
             console.error(`- no device for ${this.name} ${this.mac}`);
             return;
         }
-        await bdev.connect();
-        await bdev.Connected.waitForValue(true);
 
         const SERVICE = "0000fef1-0000-1000-8000-00805f9b34fb";
         const CHARACTERISTIC_LOW = "c4edc000-9daf-11e3-8003-00025b000b00";
@@ -49,6 +56,7 @@ export class Device {
         this.characteristicLow = characteristicLow;
         this.characteristicHigh = characteristicHigh;
         this.bdev = bdev;
+        this.path = bdev.path;
 
         console.log("- initialized");
     }
@@ -95,8 +103,30 @@ export class Device {
         if (this.bdev) {
             await this.bdev.disconnect();
             this.bdev = undefined;
+            this.path = undefined;
             this.characteristicLow = undefined;
             this.characteristicHigh = undefined;
+        }
+    }
+}
+
+function checkDeviceRemoved(removed) {
+    // console.log("checkDeviceRemoved", removed);
+    if ("path" in removed && "interfaceNames" in removed && removed.interfaceNames.indexOf("org.bluez.Device1") !== -1) {
+        // potential device
+        if (data.locations) {
+            for (const loc of data.locations) {
+                for (const dev of loc.devices) {
+                    if (dev.path === removed.path) {
+                        console.log("device removed", dev.mac);
+                        // postpone this so that we don't remove items from the list while we walk it
+                        process.nextTick(() => {
+                            if (data.onDeviceRemoved)
+                                data.onDeviceRemoved(dev);
+                        });
+                    }
+                }
+            }
         }
     }
 }
@@ -105,6 +135,9 @@ export async function initialize_locations(locations) {
     if (data.adapter === undefined) {
         console.log("connecting to bluez");
         const bluez = await new Bluez().init();
+
+        bluez.objectManager.InterfacesRemoved.on(checkDeviceRemoved);
+
         const adapter = await Adapter.connect(bluez, "/org/bluez/hci0");
         await adapter.Powered.set(true);
 
@@ -169,4 +202,8 @@ export async function initialize_locations(locations) {
     }
 
     return data.locations;
+}
+
+export function on_device_removed(handler) {
+    data.onDeviceRemoved = handler;
 }

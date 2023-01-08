@@ -27,3 +27,25 @@ export function waitForAsync(timeout, call, ...args) {
         });
     });
 }
+
+export function match(needle, haystack) {
+    for (let k of Object.keys(needle)) {
+        if (haystack[k] !== needle[k])
+            return false;
+    }
+    return true;
+}
+
+export async function retryOnError(type, retry, call, ...args) {
+    let n = 0;
+    for (; n < retry.maxRetries; ++n) {
+        try {
+            return await call(...args);
+        } catch (e) {
+            if (match(type, e))
+                continue;
+            throw e;
+        }
+    }
+    return undefined;
+}
