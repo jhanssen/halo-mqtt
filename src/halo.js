@@ -217,6 +217,7 @@ export async function initialize_locations(locations) {
     if (locations) {
         if (data.locations === undefined)
             data.locations = [];
+        const deviceInits = [];
         for (const loc of locations) {
             const key = generate_key(Buffer.concat([
                 Buffer.from(loc.passphrase, "ascii"),
@@ -241,9 +242,12 @@ export async function initialize_locations(locations) {
                 }
                 // no, add it
                 const ndev = new Device(dev.did, dev.pid, dev.name, dev.mac, key);
-                await ndev.init();
+                deviceInits.push(ndev.init());
                 devices.push(ndev);
             }
+        }
+        if (deviceInits.length > 0) {
+            await Promise.all(deviceInits);
         }
     }
 
