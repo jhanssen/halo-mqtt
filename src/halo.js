@@ -127,8 +127,7 @@ export async function initialize_locations(locations) {
                 await waitForAsync(7500, () => { return adapter.startDiscovery(); });
                 await adapter.Discovering.waitForValue(true);
             } catch (e) {
-                if (e instanceof AsyncTimeoutError) {
-                } else {
+                if (!(e instanceof AsyncTimeoutError)) {
                     throw e;
                 }
             }
