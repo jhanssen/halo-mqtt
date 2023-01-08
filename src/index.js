@@ -36,6 +36,9 @@ if (mqttPassword !== undefined) {
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
 
+const PublishKeep = 0;
+const PublishOverride = 1;
+
 let mqttConnected = false;
 const client = mqtt.connect(mqttHost, mqttOpts);
 client.on("connect", () => {
@@ -43,7 +46,7 @@ client.on("connect", () => {
         console.log("listening for halomqtt/light/set");
     });
     mqttConnected = true;
-    publishDevices();
+    publishDevices(data.locations, PublishKeep);
 });
 client.on("message", (topic, payload) => {
     // console.log("topic msg", topic);
@@ -139,9 +142,51 @@ client.on("message", (topic, payload) => {
     }
 });
 
-function publishDevices() {
-    if (data.locations === undefined || !mqttConnected)
+function unpublishDevices(locs) {
+    if (data.locations === undefined)
         return;
+    const existing = [];
+    if (data.locations !== undefined) {
+        for (const loc of data.locations) {
+            for (const dev of loc.devices) {
+                const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+                existing.push(devStr);
+            }
+        }
+    }
+    if (locs !== undefined) {
+        for (const loc of locs) {
+            for (const dev of loc.devices) {
+                const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
+                const idx = existing.indexOf(devStr);
+                if (idx !== -1) {
+                    existing.splice(idx, 1);
+                }
+            }
+        }
+    }
+    for (const devStr of existing) {
+        client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
+    }
+}
+
+function publishDevices(locs, mode) {
+    if (!mqttConnected)
+        return;
+    if (locs === undefined) {
+        if (mode === PublishOverride) {
+            // remove all existing
+            unpublishDevices(locs);
+            data.locations = undefined;
+        }
+        return;
+    }
+    if (data.locations !== undefined && mode === PublishKeep)
+        return;
+    if (locs !== data.locations) {
+        unpublishDevices(locs);
+    }
+    data.locations = locs;
     for (const loc of data.locations) {
         for (const dev of loc.devices) {
             const devStr = `halomqtt_${loc.location_id}_${dev.did}`;
@@ -214,8 +259,17 @@ function exit() {
 
 async function init() {
     const locs = await list_locations(haloEmail, haloPassword, haloHost);
-    data.locations = locs;
-    publishDevices();
+
+    const existing = [];
+    if (data.locations !== undefined) {
+        for (const loc of data.locations) {
+            for (const dev of loc.devices) {
+                existing.push(dev.mac);
+            }
+        }
+    }
+
+    publishDevices(locs, PublishOverride);
 
     process.once("SIGINT", exit);
     process.once("SIGTERM", exit);
