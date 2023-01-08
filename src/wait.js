@@ -15,6 +15,8 @@ export function waitForAsync(timeout, call, ...args) {
         }, timeout);
         call(...args).then(data => {
             clearTimeout(tt);
+            if (rejected)
+                return;
             resolve(data);
         }).catch(e => {
             clearTimeout(tt);
