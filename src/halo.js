@@ -18,6 +18,7 @@ export class Device {
         this.key = key;
         this.bdev = undefined;
         this.path = undefined;
+        this.dead = false;
     }
 
     async init() {
@@ -32,7 +33,9 @@ export class Device {
             await bdev.Connected.waitForValue(true);
             return bdev;
         });
+
         if (bdev === undefined) {
+            this.dead = true;
             console.error(`- no device for ${this.name} ${this.mac}`);
             return;
         }
@@ -43,12 +46,15 @@ export class Device {
 
         const service = await bdev.getService({ UUID: SERVICE }, retry);
         if (service === undefined) {
+            this.dead = true;
             console.error(`- no service for ${this.name} ${this.mac}`);
             return;
         }
+
         const characteristicLow = await service.getCharacteristic({ UUID: CHARACTERISTIC_LOW }, retry);
         const characteristicHigh = await service.getCharacteristic({ UUID: CHARACTERISTIC_HIGH }, retry);
         if (characteristicLow === undefined || characteristicHigh === undefined) {
+            this.dead = true;
             console.error(`- no characteristic for ${this.name} ${this.mac}`);
             return;
         }
@@ -62,6 +68,9 @@ export class Device {
     }
 
     async sendPacket(packet) {
+        if (this.dead)
+            return false;
+
         const csrpacket = make_packet(this.key, random_seq(), packet);
         const low = csrpacket.slice(0, 20);
         const high = csrpacket.slice(20);
@@ -100,12 +109,43 @@ export class Device {
     }
 
     async disconnect() {
-        if (this.bdev) {
+        if (!this.dead && this.bdev) {
             await this.bdev.disconnect();
-            this.bdev = undefined;
-            this.path = undefined;
-            this.characteristicLow = undefined;
-            this.characteristicHigh = undefined;
+            this.clear();
+        }
+    }
+
+    clear() {
+        this.bdev = undefined;
+        this.path = undefined;
+        this.characteristicLow = undefined;
+        this.characteristicHigh = undefined;
+    }
+}
+
+function checkDeviceAdded(added) {
+    // console.log("checkDeviceRemoved", removed);
+    if ("path" in added && "interfaceNames" in added && added.interfaceNames.indexOf("org.bluez.Device1") !== -1) {
+        // potential device
+        if (data.locations) {
+            for (const loc of data.locations) {
+                for (const dev of loc.devices) {
+                    if (dev.path === added.path) {
+                        if (!dev.dead)
+                            return;
+                        console.log("device added", dev.mac);
+
+                        dev.init().then(() => {
+                            dev.dead = false;
+                            if (data.onDeviceAlive)
+                                data.onDeviceAlive(loc, dev);
+                        }).catch(e => {
+                            console.error("unable to reinit device", dev.mac);
+                        });
+                        return;
+                    }
+                }
+            }
         }
     }
 }
@@ -118,12 +158,15 @@ function checkDeviceRemoved(removed) {
             for (const loc of data.locations) {
                 for (const dev of loc.devices) {
                     if (dev.path === removed.path) {
+                        if (dev.dead)
+                            return;
+                        dev.clear();
+                        dev.dead = true;
                         console.log("device removed", dev.mac);
-                        // postpone this so that we don't remove items from the list while we walk it
-                        process.nextTick(() => {
-                            if (data.onDeviceRemoved)
-                                data.onDeviceRemoved(dev);
-                        });
+
+                        if (data.onDeviceDead)
+                            data.onDeviceDead(loc, dev);
+                        return;
                     }
                 }
             }
@@ -136,6 +179,7 @@ export async function initialize_locations(locations) {
         console.log("connecting to bluez");
         const bluez = await new Bluez().init();
 
+        bluez.objectManager.InterfacesAdded.on(checkDeviceAdded);
         bluez.objectManager.InterfacesRemoved.on(checkDeviceRemoved);
 
         const adapter = await Adapter.connect(bluez, "/org/bluez/hci0");
@@ -204,6 +248,10 @@ export async function initialize_locations(locations) {
     return data.locations;
 }
 
-export function on_device_removed(handler) {
-    data.onDeviceRemoved = handler;
+export function on_device_dead(handler) {
+    data.onDeviceDead = handler;
+}
+
+export function on_device_alive(handler) {
+    data.onDeviceAlive = handler;
 }

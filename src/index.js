@@ -3,7 +3,7 @@ import mqtt from "mqtt";
 import { xdgData } from "xdg-basedir";
 import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
-import { initialize_locations, on_device_removed } from "./halo.js";
+import { initialize_locations, on_device_alive, on_device_dead } from "./halo.js";
 import { list_locations } from "./cloud.js";
 
 const option = options("halo-mqtt");
@@ -97,6 +97,11 @@ client.on("message", (topic, payload) => {
             return;
         }
 
+        if (dev.dead) {
+            console.error("device is dead", dev.mac);
+            return;
+        }
+
         // update state
         const devStr = `halomqtt_${locId}_${devId}`;
         const currentState = data.state[devStr];
@@ -147,18 +152,10 @@ client.on("message", (topic, payload) => {
     }
 });
 
-function unpublishDevice(dev) {
-    for (const loc of data.locations) {
-        for (let i = 0; i < loc.devices.length; ++i) {
-            if (loc.devices[i].mac === dev.mac) {
-                loc.devices.splice(i, 1);
-
-                const devStr = `halomqtt_${loc.id}_${dev.did}`;
-                console.log("unpublishing device", devStr);
-                client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
-            }
-        }
-    }
+function unpublishDevice(loc, dev) {
+    const devStr = `halomqtt_${loc.id}_${dev.did}`;
+    console.log("unpublishing device", devStr);
+    client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
 }
 
 function unpublishDevices(locs) {
@@ -187,6 +184,25 @@ function unpublishDevices(locs) {
     for (const devStr of existing) {
         client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
     }
+}
+
+function publishDevice(loc, dev) {
+    const devStr = `halomqtt_${loc.id}_${dev.did}`;
+    console.log("republishing device", devStr);
+    const discovery = {
+        name: dev.name || devStr,
+        command_topic: `${CommandTopic}/${devStr}`,
+        state_topic: `${StateTopic}/${devStr}`,
+        object_id: devStr,
+        unique_id: devStr,
+        brightness: true,
+        color_mode: true,
+        supported_color_modes: ["color_temp"],
+        max_mireds: Math.floor(1000000 / 2700),
+        min_mireds: Math.floor(1000000 / 5000),
+        schema: "json",
+    };
+    client.publish(`homeassistant/light/${devStr}/config`, JSON.stringify(discovery), { retain: true });
 }
 
 function publishDevices(locs, mode) {
@@ -271,6 +287,8 @@ function exit() {
     const waits = [];
     for (const loc of data.locations) {
         for (const dev of loc.devices) {
+            if (dev.dead)
+                continue;
             // remove device from hass
             const devStr = `halomqtt_${loc.id}_${dev.did}`;
             client.publish(`homeassistant/light/${devStr}/config`, "", { retain: true });
@@ -358,7 +376,8 @@ async function initLocal() {
 }
 
 async function init() {
-    on_device_removed(dev => unpublishDevice(dev));
+    on_device_alive((loc, dev) => publishDevice(loc, dev));
+    on_device_dead((loc, dev) => unpublishDevice(loc, dev));
 
     await initLocal();
     await initCloud();
