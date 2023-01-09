@@ -158,6 +158,15 @@ client.on("message", (topic, payload) => {
             console.error("no brightness or colorTemp", topic, json);
         }
 
+        if (brightness !== undefined) {
+            currentState.brightness = brightness;
+            currentState.state = brightness === 0 ? "OFF" : "ON";
+        }
+
+        if (colorTemp !== undefined) {
+            currentState.color_temp = json.color_temp;
+        }
+
         console.log("update state", `${StateTopic}/${devStr}`, currentState);
         client.publish(`${StateTopic}/${devStr}`, JSON.stringify(currentState), { retain: true });
 
@@ -179,8 +188,6 @@ client.on("message", (topic, payload) => {
                         console.error("failed to set brightness", e);
                     }
                 });
-                currentState.brightness = brightness;
-                currentState.state = brightness === 0 ? "OFF" : "ON";
             }
             if (colorTemp !== undefined) {
                 console.log("set color temp", devStr, colorTemp);
@@ -199,7 +206,6 @@ client.on("message", (topic, payload) => {
                         console.error("failed to set color temp", e);
                     }
                 });
-                currentState.color_temp = json.color_temp;
             }
         };
 
