@@ -161,11 +161,23 @@ client.on("message", (topic, payload) => {
         console.log("update state", `${StateTopic}/${devStr}`, currentState);
         client.publish(`${StateTopic}/${devStr}`, JSON.stringify(currentState), { retain: true });
 
-        enqueue(() => {
+        const cmd = () => {
             if (brightness !== undefined) {
                 console.log("set brightness", devStr, brightness);
                 dev.set_brightness(brightness).catch(e => {
-                    console.error("failed to set brightness", e);
+                    if (e.type === "org.bluez.Error.Failed" && e.text === "Not connected") {
+                        // try to reconnect
+                        console.log("set brightness failed, trying to reconnect");
+                        dev.init().then(() => {
+                            process.nextTick(() => {
+                                enqueue(cmd);
+                            });
+                        }).catch(e => {
+                            console.error("reconnect failed", e);
+                        });
+                    } else {
+                        console.error("failed to set brightness", e);
+                    }
                 });
                 currentState.brightness = brightness;
                 currentState.state = brightness === 0 ? "OFF" : "ON";
@@ -173,11 +185,25 @@ client.on("message", (topic, payload) => {
             if (colorTemp !== undefined) {
                 console.log("set color temp", devStr, colorTemp);
                 dev.set_color_temp(colorTemp).catch(e => {
-                    console.error("failed to set color temp", e);
+                    if (e.type === "org.bluez.Error.Failed" && e.text === "Not connected") {
+                        // try to reconnect
+                        console.log("set color temp failed, trying to reconnect");
+                        dev.init().then(() => {
+                            process.nextTick(() => {
+                                enqueue(cmd);
+                            });
+                        }).catch(e => {
+                            console.error("reconnect failed", e);
+                        });
+                    } else {
+                        console.error("failed to set color temp", e);
+                    }
                 });
                 currentState.color_temp = json.color_temp;
             }
-        });
+        };
+
+        enqueue(cmd);
     }
 });
 
