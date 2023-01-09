@@ -39,6 +39,7 @@ if (mqttPassword !== undefined) {
 const localLocationsFile = `${xdgData}/halo-mqtt/locations.json`;
 
 const QueueDelay = 1000;
+const MaxConnectRetries = 5;
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
 
@@ -163,6 +164,7 @@ client.on("message", (topic, payload) => {
             currentState.brightness = brightness;
             currentState.state = brightness === 0 ? "OFF" : "ON";
 
+            let connectCount = 0;
             const cmd = () => {
                 console.log("set brightness", devStr, brightness);
                 dev.set_brightness(brightness).catch(e => {
@@ -171,9 +173,11 @@ client.on("message", (topic, payload) => {
                             // try to reconnect
                             console.log("set brightness failed, trying to reconnect");
                             dev.init().then(() => {
+                                if (connectCount++ < MaxConnectRetries)
+                                    dev.dead = false;
                                 process.nextTick(() => { enqueue(cmd); });
                             }).catch(e => {
-                                console.error("reconnect failed", e);
+                                console.error("device reinit failed", e);
                             });
                         } else {
                             console.error("brightness failed", e);
@@ -191,6 +195,7 @@ client.on("message", (topic, payload) => {
         if (colorTemp !== undefined) {
             currentState.color_temp = json.color_temp;
 
+            let connectCount = 0;
             const cmd = () => {
                 console.log("set color temp", devStr, colorTemp);
                 dev.set_color_temp(colorTemp).catch(e => {
@@ -199,9 +204,11 @@ client.on("message", (topic, payload) => {
                             // try to reconnect
                             console.log("set color temp failed, trying to reconnect");
                             dev.init().then(() => {
+                                if (connectCount++ < MaxConnectRetries)
+                                    dev.dead = false;
                                 process.nextTick(() => { enqueue(cmd); });
                             }).catch(e => {
-                                console.error("reconnect failed", e);
+                                console.error("device reinit failed", e);
                             });
                         } else {
                             console.error("color temp failed", e);
