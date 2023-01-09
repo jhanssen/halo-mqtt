@@ -162,17 +162,8 @@ client.on("message", (topic, payload) => {
         if (brightness !== undefined) {
             currentState.brightness = brightness;
             currentState.state = brightness === 0 ? "OFF" : "ON";
-        }
 
-        if (colorTemp !== undefined) {
-            currentState.color_temp = json.color_temp;
-        }
-
-        console.log("update state", `${StateTopic}/${devStr}`, currentState);
-        client.publish(`${StateTopic}/${devStr}`, JSON.stringify(currentState), { retain: true });
-
-        const cmd = () => {
-            if (brightness !== undefined) {
+            const cmd = () => {
                 console.log("set brightness", devStr, brightness);
                 dev.set_brightness(brightness).catch(e => {
                     if (e.type === "org.bluez.Error.Failed") {
@@ -191,8 +182,14 @@ client.on("message", (topic, payload) => {
                         console.error("failed to set brightness", e);
                     }
                 });
-            }
-            if (colorTemp !== undefined) {
+            };
+
+            enqueue(cmd);
+        }
+        if (colorTemp !== undefined) {
+            currentState.color_temp = json.color_temp;
+
+            const cmd = () => {
                 console.log("set color temp", devStr, colorTemp);
                 dev.set_color_temp(colorTemp).catch(e => {
                     if (e.type === "org.bluez.Error.Failed") {
@@ -211,10 +208,13 @@ client.on("message", (topic, payload) => {
                         console.error("failed to set color temp", e);
                     }
                 });
-            }
-        };
+            };
 
-        enqueue(cmd);
+            enqueue(cmd);
+        }
+
+        console.log("update state", `${StateTopic}/${devStr}`, currentState);
+        client.publish(`${StateTopic}/${devStr}`, JSON.stringify(currentState), { retain: true });
     }
 });
 
