@@ -39,6 +39,7 @@ if (mqttPassword !== undefined) {
 const localLocationsFile = `${xdgData}/halo-mqtt/locations.json`;
 
 const QueueDelay = 1000;
+const RetryDelay = 1000;
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
 
@@ -174,16 +175,18 @@ client.on("message", (topic, payload) => {
             if (brightness !== undefined) {
                 console.log("set brightness", devStr, brightness);
                 dev.set_brightness(brightness).catch(e => {
-                    if (e.type === "org.bluez.Error.Failed" && e.text === "Not connected") {
-                        // try to reconnect
-                        console.log("set brightness failed, trying to reconnect");
-                        dev.init().then(() => {
-                            process.nextTick(() => {
-                                enqueue(cmd);
+                    if (e.type === "org.bluez.Error.Failed") {
+                        if (e.text === "Not connected") {
+                            // try to reconnect
+                            console.log("set brightness failed, trying to reconnect");
+                            dev.init().then(() => {
+                                process.nextTick(() => { enqueue(cmd); });
+                            }).catch(e => {
+                                console.error("reconnect failed", e);
                             });
-                        }).catch(e => {
-                            console.error("reconnect failed", e);
-                        });
+                        }
+                    } else if (e.type === "org.bluez.Error.InProgress") {
+                        setTimeout(() => { enqueue(cmd); }, RetryDelay);
                     } else {
                         console.error("failed to set brightness", e);
                     }
@@ -192,16 +195,18 @@ client.on("message", (topic, payload) => {
             if (colorTemp !== undefined) {
                 console.log("set color temp", devStr, colorTemp);
                 dev.set_color_temp(colorTemp).catch(e => {
-                    if (e.type === "org.bluez.Error.Failed" && e.text === "Not connected") {
-                        // try to reconnect
-                        console.log("set color temp failed, trying to reconnect");
-                        dev.init().then(() => {
-                            process.nextTick(() => {
-                                enqueue(cmd);
+                    if (e.type === "org.bluez.Error.Failed") {
+                        if (e.text === "Not connected") {
+                            // try to reconnect
+                            console.log("set color temp failed, trying to reconnect");
+                            dev.init().then(() => {
+                                process.nextTick(() => { enqueue(cmd); });
+                            }).catch(e => {
+                                console.error("reconnect failed", e);
                             });
-                        }).catch(e => {
-                            console.error("reconnect failed", e);
-                        });
+                        }
+                    } else if (e.type === "org.bluez.Error.InProgress") {
+                        setTimeout(() => { enqueue(cmd); }, RetryDelay);
                     } else {
                         console.error("failed to set color temp", e);
                     }
