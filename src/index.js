@@ -3,7 +3,7 @@ import mqtt from "mqtt";
 import { xdgData } from "xdg-basedir";
 import { readFile, writeFile, mkdir, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
-import { initialize_locations, on_device_alive, on_device_dead } from "./halo.js";
+import { find_location, initialize_locations, on_device_alive, on_device_dead } from "./halo.js";
 import { list_locations } from "./cloud.js";
 
 const option = options("halo-mqtt");
@@ -173,8 +173,18 @@ client.on("message", (topic, payload) => {
                             // try to reconnect
                             console.log("set brightness failed, trying to reconnect");
                             dev.init().then(() => {
-                                if (connectCount++ < MaxConnectRetries)
+                                if (connectCount++ < MaxConnectRetries) {
                                     dev.dead = false;
+                                } else if (dev.dead) {
+                                    // tell hass this device is dead
+                                    const loc = find_location(data.locations, dev);
+                                    if (loc !== undefined) {
+                                        console.log(`device is dead after ${MaxConnectRetries} retries`, dev.mac);
+                                        unpublishDevice(loc, dev);
+                                    } else {
+                                        console.log("device dead but not found in locations", dev.mac);
+                                    }
+                                }
                                 process.nextTick(() => { enqueue(cmd); });
                             }).catch(e => {
                                 console.error("device reinit failed", e);
@@ -204,8 +214,18 @@ client.on("message", (topic, payload) => {
                             // try to reconnect
                             console.log("set color temp failed, trying to reconnect");
                             dev.init().then(() => {
-                                if (connectCount++ < MaxConnectRetries)
+                                if (connectCount++ < MaxConnectRetries) {
                                     dev.dead = false;
+                                } else if (dev.dead) {
+                                    // tell hass this device is dead
+                                    const loc = find_location(data.locations, dev);
+                                    if (loc !== undefined) {
+                                        console.log(`device is dead after ${MaxConnectRetries} retries`, dev.mac);
+                                        unpublishDevice(loc, dev);
+                                    } else {
+                                        console.log("device dead but not found in locations", dev.mac);
+                                    }
+                                }
                                 process.nextTick(() => { enqueue(cmd); });
                             }).catch(e => {
                                 console.error("device reinit failed", e);
@@ -303,15 +323,10 @@ function publishDevices(locs, mode) {
         for (const dev of loc.devices) {
             let shouldPublish = !dev.dead;
             if (shouldPublish && data.locations !== undefined) {
-                for (const eloc of data.locations) {
-                    for (const edev of eloc.devices) {
-                        if (edev.mac === dev.mac) {
-                            shouldPublish = false;
-                            break;
-                        }
-                    }
-                    if (!shouldPublish)
-                        break;
+                const floc = find_location(data.locations, dev);
+                if (floc !== undefined) {
+                    shouldPublish = false;
+                    break;
                 }
             }
 

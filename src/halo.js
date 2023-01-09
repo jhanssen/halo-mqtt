@@ -254,6 +254,17 @@ export async function initialize_locations(locations) {
     return data.locations;
 }
 
+export function find_location(locations, dev) {
+    for (const floc of locations) {
+        for (const fdev of floc.devices) {
+            if (dev.mac === fdev.mac) {
+                return floc;
+            }
+        }
+    }
+    return undefined;
+}
+
 export function on_device_dead(handler) {
     data.onDeviceDead = handler;
 }
