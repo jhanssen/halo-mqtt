@@ -46,32 +46,31 @@ const StateTopic = "halomqtt/light/state";
 const PublishKeep = 0;
 const PublishOverride = 1;
 
+const EnqueueBack = 0;
+const EnqueueFront = 1;
+
 let mqttConnected = false;
 
 function runQueue() {
-    const cmd = data.queue.pop();
-    if (cmd !== undefined) {
-        cmd();
-    }
-}
-
-function enqueue(cmd) {
-    data.queue.push(cmd);
-
     if (data.queueTimer !== undefined)
         return;
 
-    runQueue();
-
-    data.queueTimer = setInterval(() => {
+    data.queueTimer = setTimeout(() => {
+        data.queueTimer = undefined;
         if (data.queue.length === 0) {
-            clearInterval(data.queueTimer);
-            data.queueTimer = undefined;
             return;
         }
 
-        runQueue();
+        data.queue.pop()();
     }, QueueDelay);
+}
+
+function enqueue(cmd, where) {
+    if (where === EnqueueFront) {
+        data.queue.splice(0, 0, cmd);
+    } else {
+        data.queue.push(cmd);
+    }
 }
 
 const client = mqtt.connect(mqttHost, mqttOpts);
@@ -167,9 +166,13 @@ client.on("message", (topic, payload) => {
             let connectCount = 0;
             const cmd = () => {
                 console.log("set brightness", devStr, brightness);
-                dev.set_brightness(brightness).catch(e => {
+                dev.set_brightness(brightness).then(() => {
+                    runQueue();
+                }).catch(e => {
                     if (e.type === "org.bluez.Error.Failed") {
                         if (e.text === "Not connected") {
+                            enqueue(cmd, EnqueueFront);
+
                             // try to reconnect
                             console.log("set brightness failed, trying to reconnect");
                             dev.init().then(() => {
@@ -185,22 +188,31 @@ client.on("message", (topic, payload) => {
                                         console.log("device dead but not found in locations", dev.mac);
                                     }
                                 }
-                                process.nextTick(() => { enqueue(cmd); });
+
+                                runQueue();
                             }).catch(e => {
                                 console.error("device reinit failed", e);
+
+                                runQueue();
                             });
                         } else {
                             console.error("brightness failed", e);
+
+                            runQueue();
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
-                        enqueue(cmd);
+                        enqueue(cmd, EnqueueFront);
+                        runQueue();
                     } else {
                         console.error("failed to set brightness", e);
+
+                        runQueue();
                     }
                 });
             };
 
             enqueue(cmd);
+            runQueue();
         }
         if (colorTemp !== undefined) {
             currentState.color_temp = json.color_temp;
@@ -208,9 +220,13 @@ client.on("message", (topic, payload) => {
             let connectCount = 0;
             const cmd = () => {
                 console.log("set color temp", devStr, colorTemp);
-                dev.set_color_temp(colorTemp).catch(e => {
+                dev.set_color_temp(colorTemp).then(() => {
+                    runQueue();
+                }).catch(e => {
                     if (e.type === "org.bluez.Error.Failed") {
                         if (e.text === "Not connected") {
+                            enqueue(cmd, EnqueueFront);
+
                             // try to reconnect
                             console.log("set color temp failed, trying to reconnect");
                             dev.init().then(() => {
@@ -226,22 +242,31 @@ client.on("message", (topic, payload) => {
                                         console.log("device dead but not found in locations", dev.mac);
                                     }
                                 }
-                                process.nextTick(() => { enqueue(cmd); });
+
+                                runQueue();
                             }).catch(e => {
                                 console.error("device reinit failed", e);
+
+                                runQueue();
                             });
                         } else {
                             console.error("color temp failed", e);
+
+                            runQueue();
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
-                        enqueue(cmd);
+                        enqueue(cmd, EnqueueFront);
+                        runQueue();
                     } else {
                         console.error("failed to set color temp", e);
+
+                        runQueue();
                     }
                 });
             };
 
             enqueue(cmd);
+            runQueue();
         }
 
         console.log("update state", `${StateTopic}/${devStr}`, currentState);
