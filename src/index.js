@@ -175,6 +175,8 @@ client.on("message", (topic, payload) => {
                             }).catch(e => {
                                 console.error("reconnect failed", e);
                             });
+                        } else {
+                            console.error("brightness failed", e);
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
                         enqueue(cmd);
@@ -201,6 +203,8 @@ client.on("message", (topic, payload) => {
                             }).catch(e => {
                                 console.error("reconnect failed", e);
                             });
+                        } else {
+                            console.error("color temp failed", e);
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
                         enqueue(cmd);
