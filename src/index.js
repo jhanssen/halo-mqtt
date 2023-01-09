@@ -39,7 +39,6 @@ if (mqttPassword !== undefined) {
 const localLocationsFile = `${xdgData}/halo-mqtt/locations.json`;
 
 const QueueDelay = 1000;
-const RetryDelay = 1000;
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
 
@@ -64,12 +63,13 @@ function enqueue(cmd) {
     runQueue();
 
     data.queueTimer = setInterval(() => {
-        runQueue();
-
         if (data.queue.length === 0) {
             clearInterval(data.queueTimer);
             data.queueTimer = undefined;
+            return;
         }
+
+        runQueue();
     }, QueueDelay);
 }
 
@@ -177,7 +177,7 @@ client.on("message", (topic, payload) => {
                             });
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
-                        setTimeout(() => { enqueue(cmd); }, RetryDelay);
+                        enqueue(cmd);
                     } else {
                         console.error("failed to set brightness", e);
                     }
@@ -203,7 +203,7 @@ client.on("message", (topic, payload) => {
                             });
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
-                        setTimeout(() => { enqueue(cmd); }, RetryDelay);
+                        enqueue(cmd);
                     } else {
                         console.error("failed to set color temp", e);
                     }
