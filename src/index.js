@@ -16,7 +16,7 @@ const mqttUser = option("mqtt-user");
 const mqttPassword = option("mqtt-password");
 const mqttHost = option("mqtt-host");
 
-const data = { state: {}, exited: false };
+const data = { state: {}, exited: false, queue: [], queueTimer: undefined };
 
 if (mqttHost === undefined) {
     console.error("need an mqtt host");
@@ -38,6 +38,7 @@ if (mqttPassword !== undefined) {
 
 const localLocationsFile = `${xdgData}/halo-mqtt/locations.json`;
 
+const QueueDelay = 1000;
 const CommandTopic = "halomqtt/light/command";
 const StateTopic = "halomqtt/light/state";
 
@@ -45,6 +46,32 @@ const PublishKeep = 0;
 const PublishOverride = 1;
 
 let mqttConnected = false;
+
+function runQueue() {
+    const cmd = data.queue.pop();
+    if (cmd !== undefined) {
+        cmd();
+    }
+}
+
+function enqueue(cmd) {
+    data.queue.push(cmd);
+
+    if (data.queueTimer !== undefined)
+        return;
+
+    runQueue();
+
+    data.queueTimer = setInterval(() => {
+        runQueue();
+
+        if (data.queue.length === 0) {
+            clearInterval(data.queueTimer);
+            data.queueTimer = undefined;
+        }
+    }, QueueDelay);
+}
+
 const client = mqtt.connect(mqttHost, mqttOpts);
 client.on("connect", () => {
     client.subscribe([CommandTopic + "/+"], () => {
@@ -131,24 +158,26 @@ client.on("message", (topic, payload) => {
             console.error("no brightness or colorTemp", topic, json);
         }
 
-        if (brightness !== undefined) {
-            console.log("set brightness", devStr, brightness);
-            dev.set_brightness(brightness).catch(e => {
-                console.error("failed to set brightness", e);
-            });
-            currentState.brightness = brightness;
-            currentState.state = brightness === 0 ? "OFF" : "ON";
-        }
-        if (colorTemp !== undefined) {
-            console.log("set color temp", devStr, colorTemp);
-            dev.set_color_temp(colorTemp).catch(e => {
-                console.error("failed to set color temp", e);
-            });
-            currentState.color_temp = json.color_temp;
-        }
-
         console.log("update state", `${StateTopic}/${devStr}`, currentState);
         client.publish(`${StateTopic}/${devStr}`, JSON.stringify(currentState), { retain: true });
+
+        enqueue(() => {
+            if (brightness !== undefined) {
+                console.log("set brightness", devStr, brightness);
+                dev.set_brightness(brightness).catch(e => {
+                    console.error("failed to set brightness", e);
+                });
+                currentState.brightness = brightness;
+                currentState.state = brightness === 0 ? "OFF" : "ON";
+            }
+            if (colorTemp !== undefined) {
+                console.log("set color temp", devStr, colorTemp);
+                dev.set_color_temp(colorTemp).catch(e => {
+                    console.error("failed to set color temp", e);
+                });
+                currentState.color_temp = json.color_temp;
+            }
+        });
     }
 });
 
