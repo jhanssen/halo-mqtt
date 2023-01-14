@@ -16,7 +16,7 @@ const mqttUser = option("mqtt-user");
 const mqttPassword = option("mqtt-password");
 const mqttHost = option("mqtt-host");
 
-const data = { state: {}, exited: false, queue: [], queueTimer: undefined };
+const data = { state: {}, exited: false, queue: {} };
 
 if (mqttHost === undefined) {
     console.error("need an mqtt host");
@@ -51,25 +51,42 @@ const EnqueueFront = 1;
 
 let mqttConnected = false;
 
-function runQueue() {
-    if (data.queueTimer !== undefined)
-        return;
-
-    data.queueTimer = setTimeout(() => {
-        data.queueTimer = undefined;
-        if (data.queue.length === 0) {
-            return;
-        }
-
-        data.queue.pop()();
-    }, QueueDelay);
+function queueFor(mac) {
+    if (mac in data.queue) {
+        return data.queue[mac];
+    }
+    const q = {
+        timer: undefined,
+        queue: []
+    };
+    data.queue[mac] = q;
+    return q;
 }
 
-function enqueue(cmd, where) {
+function runQueue() {
+    for (const mac of Object.keys(data.queue)) {
+        const queueData = data.queue[mac];
+
+        if (queueData.timer !== undefined)
+            continue;
+
+        queueData.timer = setTimeout(() => {
+            queueData.timer = undefined;
+            if (queueData.queue.length === 0) {
+                return;
+            }
+
+            queueData.queue.pop()();
+        }, QueueDelay);
+    }
+}
+
+function enqueue(mac, cmd, where) {
+    const queueData = queueFor(mac);
     if (where === EnqueueFront) {
-        data.queue.splice(0, 0, cmd);
+        queueData.queue.splice(0, 0, cmd);
     } else {
-        data.queue.push(cmd);
+        queueData.queue.push(cmd);
     }
 }
 
@@ -138,6 +155,7 @@ client.on("message", (topic, payload) => {
             return;
         }
 
+        const mac = dev.mac;
         let brightness = undefined;
         let colorTemp = undefined;
         if ("brightness" in json) {
@@ -171,7 +189,7 @@ client.on("message", (topic, payload) => {
                 }).catch(e => {
                     if (e.type === "org.bluez.Error.Failed") {
                         if (e.text === "Not connected") {
-                            enqueue(cmd, EnqueueFront);
+                            enqueue(mac, cmd, EnqueueFront);
 
                             // try to reconnect
                             console.log("set brightness failed, trying to reconnect");
@@ -182,10 +200,10 @@ client.on("message", (topic, payload) => {
                                     // tell hass this device is dead
                                     const loc = find_location(data.locations, dev);
                                     if (loc !== undefined) {
-                                        console.log(`device is dead after ${MaxConnectRetries} retries`, dev.mac);
+                                        console.log(`device is dead after ${MaxConnectRetries} retries`, mac);
                                         unpublishDevice(loc, dev);
                                     } else {
-                                        console.log("device dead but not found in locations", dev.mac);
+                                        console.log("device dead but not found in locations", mac);
                                     }
                                 }
 
@@ -201,7 +219,7 @@ client.on("message", (topic, payload) => {
                             runQueue();
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
-                        enqueue(cmd, EnqueueFront);
+                        enqueue(mac, cmd, EnqueueFront);
                         runQueue();
                     } else {
                         console.error("failed to set brightness", e);
@@ -211,7 +229,7 @@ client.on("message", (topic, payload) => {
                 });
             };
 
-            enqueue(cmd);
+            enqueue(mac, cmd);
             runQueue();
         }
         if (colorTemp !== undefined) {
@@ -225,7 +243,7 @@ client.on("message", (topic, payload) => {
                 }).catch(e => {
                     if (e.type === "org.bluez.Error.Failed") {
                         if (e.text === "Not connected") {
-                            enqueue(cmd, EnqueueFront);
+                            enqueue(mac, cmd, EnqueueFront);
 
                             // try to reconnect
                             console.log("set color temp failed, trying to reconnect");
@@ -236,10 +254,10 @@ client.on("message", (topic, payload) => {
                                     // tell hass this device is dead
                                     const loc = find_location(data.locations, dev);
                                     if (loc !== undefined) {
-                                        console.log(`device is dead after ${MaxConnectRetries} retries`, dev.mac);
+                                        console.log(`device is dead after ${MaxConnectRetries} retries`, mac);
                                         unpublishDevice(loc, dev);
                                     } else {
-                                        console.log("device dead but not found in locations", dev.mac);
+                                        console.log("device dead but not found in locations", mac);
                                     }
                                 }
 
@@ -255,7 +273,7 @@ client.on("message", (topic, payload) => {
                             runQueue();
                         }
                     } else if (e.type === "org.bluez.Error.InProgress") {
-                        enqueue(cmd, EnqueueFront);
+                        enqueue(mac, cmd, EnqueueFront);
                         runQueue();
                     } else {
                         console.error("failed to set color temp", e);
@@ -265,7 +283,7 @@ client.on("message", (topic, payload) => {
                 });
             };
 
-            enqueue(cmd);
+            enqueue(mac, cmd);
             runQueue();
         }
 
