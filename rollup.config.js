@@ -8,7 +8,6 @@ import keysTransformer from "ts-transformer-keys/transformer";
 import isBuiltin from "is-builtin-module";
 
 let env = process.env.BUILD_TYPE;
-const nrdp = true;
 if (env.indexOf("debug") !== 0 && env.indexOf("release") !== 0) {
     console.error("Bad environment set", env);
     process.exit(1);
