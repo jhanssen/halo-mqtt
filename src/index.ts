@@ -2,7 +2,7 @@ import options from "@jhanssen/options";
 import mqtt from "mqtt";
 import { xdgData } from "xdg-basedir";
 
-import { load as loadCloud, CloudLocation } from "./cloud";
+import { load as loadCloud, CloudLocation, defaultHost as haloDefaultHost } from "./cloud";
 import { load as loadLocal, store as storeLocal } from "./local";
 import {
     initializeLocations, Device, Location,
@@ -11,13 +11,15 @@ import {
 
 const option = options("halo-mqtt");
 
-const haloEmail = option("halo-email") as string;
-const haloPassword = option("halo-password") as string;
-const haloHost = option("halo-host") as string;
+const haloEmail = option("halo-email") as string | undefined;
+const haloPassword = option("halo-password") as string | undefined;
+const haloHost = option("halo-host", haloDefaultHost) as string;
 
-const mqttUser = option("mqtt-user") as string;
-const mqttPassword = option("mqtt-password") as string;
-const mqttHost = option("mqtt-host") as string;
+const mqttUser = option("mqtt-user") as string | undefined;
+const mqttPassword = option("mqtt-password") as string | undefined;
+const mqttHost = option("mqtt-host") as string | undefined;
+
+const bluezIface = option("bluez-interface", "hci0") as string;
 
 interface DeviceState {
     state: "ON" | "OFF";
@@ -314,7 +316,7 @@ async function initCloud() {
     console.log("initing cloud");
     let apilocs: CloudLocation[];
     try {
-        apilocs = await loadCloud(haloEmail, haloPassword, haloHost);
+        apilocs = await loadCloud(haloEmail as string, haloPassword as string, haloHost);
     } catch (e) {
         if (data.locations) {
             // ignore this cloud error since we already have cached locations
@@ -323,7 +325,7 @@ async function initCloud() {
         }
         throw e;
     }
-    const locs = await initializeLocations(apilocs);
+    const locs = await initializeLocations(apilocs, bluezIface);
     if (locs) {
         console.log("publishing cloud");
         if (publishDevices(copyDevices(locs), PublishMode.Override)) {
@@ -337,7 +339,7 @@ async function initCloud() {
 async function initLocal() {
     console.log("initing local");
     const apilocs = await loadLocal(localLocationsFile);
-    const locs = await initializeLocations(apilocs);
+    const locs = await initializeLocations(apilocs, bluezIface);
     if (locs) {
         console.log("publishing local");
         publishDevices(copyDevices(locs), PublishMode.Keep);

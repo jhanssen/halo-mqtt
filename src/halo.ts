@@ -341,7 +341,7 @@ function checkDeviceRemoved(removed: InterfacesRemovedType) {
     }
 }
 
-export async function initializeLocations(locations: CloudLocation[] | undefined): Promise<Location[] | undefined> {
+export async function initializeLocations(locations: CloudLocation[] | undefined, iface: string): Promise<Location[] | undefined> {
     if (data.adapter === undefined) {
         console.log("connecting to bluez");
         const bluez = await new Bluez().init();
@@ -349,7 +349,7 @@ export async function initializeLocations(locations: CloudLocation[] | undefined
         bluez.objectManager.InterfacesAdded.on(checkDeviceAdded);
         bluez.objectManager.InterfacesRemoved.on(checkDeviceRemoved);
 
-        const adapter = await Adapter.connect(bluez, "/org/bluez/hci0");
+        const adapter = await Adapter.connect(bluez, `/org/bluez/${iface}`);
         await adapter.Powered.set(true);
 
         if (!await adapter.Discovering.get()) {

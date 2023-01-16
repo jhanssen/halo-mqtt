@@ -1,7 +1,7 @@
 import needle from "needle";
 
 const data: { auth_token: string | undefined } = { auth_token: undefined };
-const defaultHost = "https://api.avi-on.com";
+export const defaultHost = "https://api.avi-on.com";
 
 interface KeyValue {
     [key: string]: any;
@@ -78,8 +78,6 @@ async function load_locations(host: string): Promise<CloudLocation[]> {
 }
 
 export async function load(email: string, password: string, host: string): Promise<CloudLocation[]> {
-    if (host === undefined)
-        host = defaultHost;
     const resp = await make_request(host, "sessions", { email, password });
     if (!("credentials" in resp)) {
         throw new Error("No credentials in response");
