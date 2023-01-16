@@ -1,9 +1,9 @@
 // ported from https://github.com/nkaminski/csrmesh/blob/master/csrmesh/crypto.py
 
-import { createHash, createHmac, createCipheriv } from "node:crypto";
+import { createHash, createHmac, createCipheriv } from "crypto";
 import randomInteger from "random-int";
 
-function reverse(src) {
+function reverse(src: Buffer) {
     const buffer = Buffer.allocUnsafe(src.length);
 
     for (let i = 0, j = src.length - 1; i <= j; ++i, --j) {
@@ -14,13 +14,13 @@ function reverse(src) {
     return buffer;
 }
 
-function intTo3Bytes(num) {
+function intTo3Bytes(num: number) {
     const buf = Buffer.allocUnsafe(4);
     buf.writeUint32LE(num);
-    return buf.slice(0, 3);
+    return buf.subarray(0, 3);
 }
 
-function makeIV(source, seq_arr) {
+function makeIV(source: number, seq_arr: Buffer) {
     const iv = Buffer.alloc(16);
     seq_arr.copy(iv, 0);
     iv.writeUint16LE(source, 4);
@@ -28,15 +28,15 @@ function makeIV(source, seq_arr) {
     return iv;
 }
 
-export function generate_key(data) {
+export function generate_key(data: Buffer) {
     const hash = createHash("sha256");
     // console.log("generating key", data);
     hash.update(data);
     const ba = reverse(hash.digest());
-    return ba.slice(0, 16);
+    return ba.subarray(0, 16);
 }
 
-export function make_packet(key, seq, data) {
+export function make_packet(key: Buffer, seq: number, data: Buffer) {
     // console.log("key", key);
     // console.log("data", data);
     const eof = 0xff;
@@ -51,7 +51,7 @@ export function make_packet(key, seq, data) {
     // console.log("prehmac", prehmac);
     const hmac = createHmac("sha256", key);
     hmac.update(prehmac);
-    const hm = reverse(hmac.digest()).slice(0, 8);
+    const hm = reverse(hmac.digest()).subarray(0, 8);
     const final = Buffer.allocUnsafe(14 + payload.byteLength);
     seq_arr.copy(final, 0);
     final.writeUint16LE(source, 3);

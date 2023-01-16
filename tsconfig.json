@@ -1,0 +1,26 @@
+{
+    "include": [
+	"./src/**/*/",
+    ],
+    "compilerOptions": {
+	"lib": ["es2020"],
+	"target": "es2020",
+        "module": "es6",
+	"declaration": true,
+	"declarationDir": "./dist/typings",
+	"moduleResolution": "node",
+	"pretty": true,
+	"noImplicitAny": true,
+	"esModuleInterop": true,
+	"strictNullChecks": true,
+	"strictPropertyInitialization": true,
+	"downlevelIteration": true,
+	"strict": true,
+	"sourceMap": true,
+	"incremental": false,
+	"baseUrl": ".",
+	"paths": {
+            "~/*": ["src/*"]
+        }
+    }
+}
