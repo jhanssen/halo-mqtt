@@ -4,8 +4,8 @@ export class AsyncTimeoutError extends Error {
     }
 }
 
-export function waitForAsync(timeout: number, call: (...args: any) => Promise<any>, ...args: any) {
-    return new Promise((resolve, reject) => {
+export function waitForAsync<T>(timeout: number, call: (...args: unknown[]) => Promise<T>, ...args: unknown[]) {
+    return new Promise<T>((resolve, reject) => {
         let rejected = false;
         const tt = setTimeout(() => {
             if (rejected)
@@ -38,7 +38,7 @@ export function sleep(timeout: number) {
 }
 
 type MatchType = {
-    [ key: string ]: any;
+    [ key: string ]: unknown;
 };
 
 interface RetryType {
@@ -54,7 +54,7 @@ export function match(needle: MatchType, haystack: MatchType) {
     return true;
 }
 
-export async function retryOnError<T>(needle: MatchType, retry: RetryType, call: (...args: any) => Promise<T | undefined>, ...args: any) {
+export async function retryOnError<T>(needle: MatchType, retry: RetryType, call: (...args: unknown[]) => Promise<T | undefined>, ...args: unknown[]) {
     let n = 0;
 
     for (; n < retry.maxRetries; ++n) {

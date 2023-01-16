@@ -40,6 +40,7 @@ interface DeviceError {
 interface DeviceQueueItem {
     cmd: () => Promise<boolean>;
     resolve: (value: boolean | PromiseLike<boolean>) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     reject: (reason?: any) => void;
 
     connectCount?: number;
@@ -354,7 +355,7 @@ export async function initializeLocations(locations: CloudLocation[] | undefined
 
         if (!await adapter.Discovering.get()) {
             try {
-                await waitForAsync(7500, () => { return adapter.startDiscovery(); });
+                await waitForAsync<void>(7500, () => { return adapter.startDiscovery(); });
                 await adapter.Discovering.waitForValue(true);
             } catch (e) {
                 if (!(e instanceof AsyncTimeoutError)) {

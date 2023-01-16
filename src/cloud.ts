@@ -4,7 +4,7 @@ const data: { auth_token: string | undefined } = { auth_token: undefined };
 export const defaultHost = "https://api.avi-on.com";
 
 interface KeyValue {
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface CloudDevice {
