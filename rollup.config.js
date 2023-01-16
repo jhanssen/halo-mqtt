@@ -73,7 +73,6 @@ export default [ {
         sourcemap: true,
     },
     plugins,
-    external: ["x11"],
     onwarn(warning, warn) {
         if (warning.code === 'THIS_IS_UNDEFINED') return;
         warn(warning);
