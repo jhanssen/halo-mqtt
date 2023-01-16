@@ -5,9 +5,8 @@
     "compilerOptions": {
 	"lib": ["es2020"],
 	"target": "es2020",
-        "module": "es6",
-	"declaration": true,
-	"declarationDir": "./dist/typings",
+	"module": "es6",
+	"declaration": false,
 	"moduleResolution": "node",
 	"pretty": true,
 	"noImplicitAny": true,
@@ -20,7 +19,7 @@
 	"incremental": false,
 	"baseUrl": ".",
 	"paths": {
-            "~/*": ["src/*"]
-        }
+	    "~/*": ["src/*"]
+	}
     }
 }
