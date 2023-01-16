@@ -10,11 +10,7 @@
     "debug": "run-p lint flavor:debug",
     "release": "run-p lint flavor:release",
     "build": "run-p lint flavor:debug flavor:release",
-    "clean": "del-cli dist/* .cache/*",
-    "watch": "rollup -cw --environment BUILD_TYPE:debug",
-    "watch:debug": "rollup -cw --environment BUILD_TYPE:debug",
-    "watch:release": "rollup -cw --environment BUILD_TYPE:release",
-    "serve": "http-server -c-1 ."
+    "clean": "del-cli dist/* .cache/*"
   },
   "author": "",
   "license": "MIT",
@@ -47,7 +43,6 @@
     "eslint-plugin-import": "^2.27.4",
     "eslint-plugin-jsdoc": "^32.3.4",
     "eslint-plugin-prefer-arrow": "^1.2.3",
-    "http-server": "^14.1.1",
     "is-builtin-module": "^3.2.0",
     "npm-run-all": "^4.1.5",
     "rollup": "^2.79.1",
