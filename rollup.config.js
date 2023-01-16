@@ -4,7 +4,8 @@ import json from "@rollup/plugin-json";
 import babel from "@rollup/plugin-babel";
 import terser from "@rollup/plugin-terser";
 import typescript from "@rollup/plugin-typescript";
-import keysTransformer from 'ts-transformer-keys/transformer';
+import keysTransformer from "ts-transformer-keys/transformer";
+import isBuiltin from "is-builtin-module";
 
 let env = process.env.BUILD_TYPE;
 const nrdp = true;
@@ -20,7 +21,11 @@ if (release) {
 }
 
 const plugins = [
-    resolve({ preferBuiltins: true }),
+    resolve({
+        resolveOnly: (module) => module === "string_decoder" || !isBuiltin(module),
+        preferBuiltins: false,
+        exportConditions: ['node'],
+    }),
     json(),
     commonjs(),
     typescript({
