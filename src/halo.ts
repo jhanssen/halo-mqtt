@@ -255,7 +255,7 @@ export class Device {
         colorBytes.writeInt16BE(color);
         const packet = Buffer.from([
             0x80 + this.did, 0x80, 0x73, 0, 0x1D,
-            0, 0, 0, 0x01, colorBytes[0], colorBytes[1], 0, 0
+            0, 0, 0, 0x01, colorBytes[0] as number, colorBytes[1] as number, 0, 0
         ]);
         console.log("set_color_temp", this.mac, color, packet);
         return await this._sendPacket(packet);
@@ -394,9 +394,9 @@ export async function initializeLocations(locations: CloudLocation[] | undefined
             let devices: Device[] | undefined;
             if (lidx === -1) {
                 data.locations.push({ id: loc.id, name: loc.name, passphrase: loc.passphrase, devices: []});
-                devices = data.locations[data.locations.length - 1].devices;
+                devices = (data.locations[data.locations.length - 1] as Location).devices;
             } else {
-                devices = existingLocs[lidx].devices;
+                devices = (existingLocs[lidx] as Location).devices;
             }
 
             for (const dev of loc.devices) {

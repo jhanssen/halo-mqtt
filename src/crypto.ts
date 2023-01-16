@@ -7,8 +7,8 @@ function reverse(src: Buffer) {
     const buffer = Buffer.allocUnsafe(src.length);
 
     for (let i = 0, j = src.length - 1; i <= j; ++i, --j) {
-        buffer[i] = src[j];
-        buffer[j] = src[i];
+        buffer[i] = src[j] as number;
+        buffer[j] = src[i] as number;
     }
 
     return buffer;

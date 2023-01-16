@@ -35,10 +35,10 @@ interface CommandPayload {
 }
 
 const data: {
-    locations?: Location[];
+    locations: Location[] | undefined;
     state: { [key: string]: DeviceState };
     exited: boolean;
-} = { state: {}, exited: false };
+} = { locations: undefined, state: {}, exited: false };
 
 if (mqttHost === undefined) {
     console.error("need an mqtt host");
@@ -234,8 +234,8 @@ client.on("message", (topic: string, payload: Buffer) => {
             return;
         }
 
-        const locId = parseInt(m[1], 10);
-        const devId = parseInt(m[2], 10);
+        const locId = parseInt(m[1] as string, 10);
+        const devId = parseInt(m[2] as string, 10);
 
         // find device
         let dev: Device | undefined;
@@ -377,7 +377,7 @@ function exit() {
     } else {
         Promise.all(waits).then(() => {
             process.exit(0);
-        }).catch(e => {
+        }).catch((e: Error) => {
             console.error("failed to disconnect from device", e.message);
             process.exit(1);
         });
@@ -397,7 +397,7 @@ async function init() {
 
 (async function() {
     await init();
-})().catch((e) => {
+})().catch(e => {
     console.error(e);
     process.exit(1);
 });

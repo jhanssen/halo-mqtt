@@ -24,8 +24,8 @@ export interface CloudLocation {
 async function make_request(host: string, path: string, body?: KeyValue) {
     const headers: { [ key: string ]: string } = {};
     if (data.auth_token !== undefined) {
-        headers.Accept = "application/api.avi-on.v2";
-        headers.Authorization = `Token ${data.auth_token}`;
+        headers["Accept"] = "application/api.avi-on.v2";
+        headers["Authorization"] = `Token ${data.auth_token}`;
     }
     let resp;
     if (body !== undefined) {
