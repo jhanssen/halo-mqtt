@@ -18,7 +18,7 @@
   },
   "author": "",
   "license": "MIT",
-  "dependencies": {
+  "devDependencies": {
     "@babel/runtime": "^7.20.7",
     "@babel/runtime-corejs2": "^7.20.7",
     "@jhanssen/options": "^1.0.31",
@@ -28,9 +28,7 @@
     "needle": "^3.2.0",
     "random-int": "^3.0.0",
     "typeflex": "^0.1.0",
-    "xdg-basedir": "^5.1.0"
-  },
-  "devDependencies": {
+    "xdg-basedir": "^5.1.0",
     "@babel/core": "^7.20.12",
     "@babel/plugin-transform-regenerator": "^7.20.5",
     "@babel/plugin-transform-runtime": "^7.19.6",
