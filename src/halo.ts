@@ -80,6 +80,7 @@ class DeviceQueue {
 
             item.cmd().then(result => {
                 item.resolve(result);
+                this.runQueue();
             }).catch((e: DeviceError) => {
                 if (e.type === "org.bluez.Error.Failed") {
                     if (e.text === "Not connected") {
