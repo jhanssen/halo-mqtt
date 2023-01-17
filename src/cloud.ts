@@ -9,7 +9,7 @@ interface KeyValue {
 
 export interface CloudDevice {
     did: number;
-    pid: number;
+    pid: string;
     name: string;
     mac: string;
 }
@@ -42,7 +42,7 @@ async function make_request<T>(host: string, path: string, body?: KeyValue): Pro
 
 interface ApiAbstractDevice {
     avid?: number;
-    pid?: number;
+    pid?: string;
     name?: string;
     friendly_mac_address?: string;
 }
@@ -63,7 +63,7 @@ async function load_devices(host: string, locid: number): Promise<CloudDevice[]>
         if (startId === undefined)
             startId = adev.avid as number;
         const did = (adev.avid as number) - startId;
-        const pid = adev.pid as number;
+        const pid = adev.pid as string;
         const name = adev.name as string;
         const mac = (adev.friendly_mac_address as string).replace(/(.{2})/g,"$1:").slice(0, -1).toUpperCase();
 

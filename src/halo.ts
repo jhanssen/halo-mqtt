@@ -134,7 +134,7 @@ class DeviceQueue {
 
 export class Device {
     public readonly did: number;
-    public readonly pid: number;
+    public readonly pid: string;
     public readonly name: string;
     public readonly mac: string;
     public readonly key: Buffer;
@@ -149,7 +149,7 @@ export class Device {
 
     private _queue: DeviceQueue;
 
-    constructor(did: number, pid: number, name: string, mac: string, key: Buffer) {
+    constructor(did: number, pid: string, name: string, mac: string, key: Buffer) {
         this.did = did;
         this.pid = pid;
         this.name = name;
