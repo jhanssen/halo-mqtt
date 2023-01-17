@@ -420,10 +420,10 @@ export async function initializeLocations(locations: CloudLocation[] | undefined
     return data.locations;
 }
 
-export function setOnDeviceAlive(alive: (loc: Location, dev: Device) => void | undefined) {
+export function setOnDeviceAlive(alive: (loc: Location, dev: Device) => void) {
     data.onDeviceAlive = alive;
 }
 
-export function setOnDeviceDead(dead: (loc: Location, dev: Device) => void | undefined) {
+export function setOnDeviceDead(dead: (loc: Location, dev: Device) => void) {
     data.onDeviceDead = dead;
 }
