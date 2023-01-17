@@ -1,7 +1,7 @@
 {
   "name": "halo-mqtt",
-  "version": "1.0.0",
-  "description": "",
+  "version": "v0.1",
+  "description": "Node project for exposing Eaton HALO Home Smart Lights to Home Assistant through MQTT discovery.",
   "main": "src/index.ts",
   "scripts": {
     "lint": "eslint . --ext .ts --no-eslintrc --config .eslint.rc.js",
@@ -12,8 +12,16 @@
     "build": "run-p lint flavor:debug flavor:release",
     "clean": "del-cli dist/* .cache/*"
   },
-  "author": "",
   "license": "MIT",
+  "author": {
+    "name": "Jan E Hanssen",
+    "url": "https://github.com/jhanssen"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhanssen/halo-mqtt.git"
+  },
+  "bugs": "https://github.com/jhanssen/halo-mqtt/issues",
   "devDependencies": {
     "@babel/core": "^7.20.12",
     "@babel/plugin-transform-regenerator": "^7.20.5",
