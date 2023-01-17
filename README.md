@@ -1,7 +1,7 @@
 # halo-mqtt
 Node project for exposing Eaton HALO Home Smart Lights to [Home Assistant](https://www.home-assistant.io/) through [MQTT discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery).
 
-Some of the code code was ported from [halohome](https://github.com/nayaverdier/halohome) and [csrmesh](https://github.com/nkaminski/csrmesh/blob/master/csrmesh/crypto.py).
+Some of the code code was ported from [halohome](https://github.com/nayaverdier/halohome) and [csrmesh](https://github.com/nkaminski/csrmesh).
 
 ## Requirements
 You need to have provisioned the lights using the Halo Home app prior to using this project. This code talks directly to the lights over Bluetooth and depends on [BlueZ](http://www.bluez.org/) for this. It thus needs to be run on a Linux system with an available Bluetooth adapter.
