@@ -42,7 +42,6 @@ async function make_request<T>(host: string, path: string, body?: KeyValue): Pro
 
 interface ApiAbstractDevice {
     avid?: number;
-    did?: number;
     pid?: number;
     name?: string;
     friendly_mac_address?: string;
