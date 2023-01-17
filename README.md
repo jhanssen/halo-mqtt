@@ -14,5 +14,13 @@ You need to have provisioned the lights using the Halo Home app prior to using t
 `--mqtt-password`: Login password for the MQTT server (optional).  
 `--bluez-interface`: What BlueZ interface to use (optional, defaults to `hci0`).  
 
+## Building
+Running the following commands
+
+    npm install
+    npm run build
+
+Should result in a debug and release .js file in a folder named `dist`.
+
 ## Known issues
 The Bluetooth connection to the lights sometimes times out. If this happens on launch when initializing the lights the only current solution is to quit and relaunch.
