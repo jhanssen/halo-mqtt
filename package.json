@@ -29,7 +29,7 @@
     "@babel/preset-env": "^7.20.2",
     "@babel/runtime": "^7.20.7",
     "@babel/runtime-corejs2": "^7.20.7",
-    "@jhanssen/options": "^1.0.31",
+    "@jhanssen/options": "^1.0.32",
     "@rollup/plugin-babel": "^5.3.1",
     "@rollup/plugin-commonjs": "^24.0.0",
     "@rollup/plugin-json": "^6.0.0",
