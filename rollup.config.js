@@ -70,7 +70,7 @@ export default [ {
     input: "src/index.ts",
     output: {
         strict: false,
-        file: `dist/index${postfix}.js`,
+        file: `dist/halo-mqtt${postfix}.js`,
         format: "cjs",
         name: "main",
         exports: "named",
