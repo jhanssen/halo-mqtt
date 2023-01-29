@@ -1,6 +1,6 @@
 {
   "name": "halo-mqtt",
-  "version": "v0.1",
+  "version": "v0.1.1",
   "description": "Node project for exposing Eaton HALO Home Smart Lights to Home Assistant through MQTT discovery.",
   "main": "src/index.ts",
   "scripts": {
