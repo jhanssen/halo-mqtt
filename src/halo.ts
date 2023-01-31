@@ -1,4 +1,4 @@
-import { Bluez, Adapter, Device as BluezDevice, GattCharacteristic, Variant, dict as Dict } from "@sorrir/bluetooth";
+import { Bluez, Adapter, Device as BluezDevice, GattCharacteristic, Variant, dict as Dict } from "blauzahn";
 import { generate_key, make_packet, random_seq } from "./crypto";
 import { waitForAsync, AsyncTimeoutError, retryOnError } from "./wait";
 import { CloudLocation } from "./cloud";
